@@ -194,14 +194,14 @@
 
 ### Tests for User Story 5
 
-- [ ] T083 [P] [US5] Integration test for FirstOrderMoCo (phase error reduction) in `tests/integration/test_moco.py`
-- [ ] T084 [P] [US5] Integration test for SecondOrderMoCo in `tests/integration/test_moco.py`
+- [x] T083 [P] [US5] Integration test for FirstOrderMoCo (phase error reduction) in `tests/integration/test_moco.py`
+- [x] T084 [P] [US5] Integration test for SecondOrderMoCo in `tests/integration/test_moco.py`
 
 ### Implementation for User Story 5
 
-- [ ] T085 [US5] Implement FirstOrderMoCo (bulk range-dependent phase correction to scene center) in `pySimSAR/algorithms/moco/first_order.py`
-- [ ] T086 [US5] Implement SecondOrderMoCo (range-dependent + aperture-dependent correction) in `pySimSAR/algorithms/moco/second_order.py`
-- [ ] T087 [US5] Register MoCo algorithms in `pySimSAR/algorithms/moco/__init__.py`
+- [x] T085 [US5] Implement FirstOrderMoCo (bulk range-dependent phase correction to scene center) in `pySimSAR/algorithms/moco/first_order.py`
+- [x] T086 [US5] Implement SecondOrderMoCo (range-dependent + aperture-dependent correction) in `pySimSAR/algorithms/moco/second_order.py`
+- [x] T087 [US5] Register MoCo algorithms in `pySimSAR/algorithms/moco/__init__.py`
 
 **Checkpoint**: MoCo reduces motion-induced phase errors. Both first-order and second-order working.
 
