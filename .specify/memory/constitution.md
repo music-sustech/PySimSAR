@@ -1,50 +1,107 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: N/A (template) → 1.0.0
+- Added principles:
+  - I. Scientific Correctness
+  - II. Library-First
+  - III. Test-First (TDD)
+  - IV. Performance-Aware
+  - V. Reproducibility
+  - VI. Modularization
+- Added sections:
+  - Technology & Dependency Constraints
+  - Development Workflow
+- Removed sections: None (fresh from template)
+- Templates requiring updates:
+  - .specify/templates/plan-template.md ✅ no changes needed (Constitution Check is dynamic)
+  - .specify/templates/spec-template.md ✅ no changes needed (structure compatible)
+  - .specify/templates/tasks-template.md ✅ no changes needed (phase structure compatible)
+- Follow-up TODOs: None
+-->
+
+# PySimSAR Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Scientific Correctness
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+All simulation outputs MUST be physically accurate and validated against
+known analytical models or published reference data. Signal processing
+algorithms MUST document the mathematical model they implement, including
+source references (papers, textbooks). Numerical precision tradeoffs
+MUST be explicitly justified and documented.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Library-First
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+All SAR simulation functionality MUST be exposed as importable Python
+APIs before any GUI or CLI wrapper. The GUI depends on the library; the
+library MUST NOT depend on the GUI. Users MUST be able to run any
+simulation pipeline purely through Python code without launching a GUI.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. Test-First (TDD)
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+Tests MUST be written before implementation. The Red-Green-Refactor
+cycle is strictly enforced: write a failing test, implement the minimum
+code to pass, then refactor. Signal processing algorithms MUST include
+tests against known analytical solutions or reference datasets.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. Performance-Aware
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+NumPy and SciPy vectorized operations MUST be preferred over Python
+loops in computational hot paths. Performance-critical functions MUST
+document their time complexity. Memory-intensive operations (e.g., large
+2D FFTs) MUST consider chunking or out-of-core strategies when array
+sizes exceed available RAM.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### V. Reproducibility
+
+All simulations MUST produce deterministic outputs given identical input
+parameters. Random number generation MUST use explicit, user-controllable
+seeds. Simulation configurations MUST be serializable so that any result
+can be reproduced from its saved parameters.
+
+### VI. Modularization
+
+Each SAR image formation algorithm (e.g., Range-Doppler, Chirp Scaling,
+Omega-K) and each motion compensation algorithm MUST be implemented as
+an independent, self-contained module conforming to a shared interface.
+Contributors MUST be able to add new algorithms without modifying
+existing ones. Modules MUST be independently testable against the shared
+interface contract.
+
+## Technology & Dependency Constraints
+
+- Python 3.10+ required
+- Core computation: NumPy, SciPy
+- GUI: PyQt6 or PySide6
+- Visualization: matplotlib, pyqtgraph (as needed)
+- Testing: pytest
+- External dependencies MUST be minimized; each new dependency MUST be
+  justified by significant functionality that would be impractical to
+  implement in-house
+
+## Development Workflow
+
+- All changes MUST go through pull requests with code review
+- All tests MUST pass before merge to main
+- Each PR MUST target a single feature or fix
+- Feature branches follow the `###-short-name` naming convention
+- Commit messages MUST be descriptive and reference relevant issues
+- The Speckit workflow (specify → plan → tasks → implement) MUST be
+  followed for new features
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution is the authoritative source for development principles
+in PySimSAR. All PRs and code reviews MUST verify compliance with these
+principles. Amendments to this constitution require:
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+1. A written proposal documenting the change and rationale
+2. Review and approval via pull request
+3. A migration plan if existing code is affected
+4. Version increment following semantic versioning
+
+Complexity beyond what these principles prescribe MUST be justified
+in the relevant plan document.
+
+**Version**: 1.0.0 | **Ratified**: 2026-03-14 | **Last Amended**: 2026-03-14
