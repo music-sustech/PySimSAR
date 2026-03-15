@@ -40,6 +40,10 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP"]
+ignore = ["N999"]  # pySimSAR uses intentional camelCase package name
+
+[tool.ruff.lint.isort]
+known-first-party = ["pySimSAR"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
