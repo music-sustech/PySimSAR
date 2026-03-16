@@ -148,10 +148,24 @@ pySimSAR/                    # Main Python package
 │       ├── yamaguchi.py
 │       └── cloude_pottier.py
 │
+├── core/                    # (continued)
+│   └── rcs_model.py         # RCSModel ABC + StaticRCS
+│
 ├── io/                      # Data format I/O
 │   ├── __init__.py
 │   ├── hdf5_format.py       # HDF5 read/write for all data types
-│   └── config.py            # Simulation config serialization
+│   ├── config.py            # Simulation config serialization
+│   └── parameter_set.py     # Parameter set load/save ($ref/$data)
+│
+├── presets/                 # Shipped default parameter presets
+│   ├── antennas/            # flat, sinc, gaussian antenna JSONs
+│   ├── waveforms/           # LFM, FMCW preset JSONs
+│   ├── sensors/             # GPS, IMU preset JSONs
+│   └── platforms/           # Airborne, UAV preset JSONs
+│
+├── tools/                   # CLI utilities
+│   ├── __init__.py
+│   └── view_array.py        # Binary array visualization tool
 │
 ├── pipeline/                # Processing pipeline orchestration
 │   ├── __init__.py
@@ -184,13 +198,21 @@ tests/
 │   ├── test_gps.py
 │   ├── test_imu.py
 │   ├── test_signal.py
-│   └── test_io.py
+│   ├── test_io.py
+│   ├── test_parameter_set.py   # Parameter set I/O unit tests
+│   ├── test_rcs_model.py       # RCS model unit tests
+│   └── test_view_array.py      # Visualization tool tests
 ├── integration/
 │   ├── test_simulation_pipeline.py
 │   ├── test_image_formation.py
 │   ├── test_moco.py
 │   ├── test_geocoding.py
-│   └── test_polarimetry.py
+│   ├── test_polarimetry.py
+│   └── test_golden.py          # Golden reference test runner
+├── golden/                     # Golden reference test case directories
+│   ├── single_point_stripmap/  # Case 1: simplest end-to-end
+│   ├── multi_target_spotlight/ # Case 2: multi-target spotlight
+│   └── motion_moco_autofocus/  # Case 3: motion + MoCo + autofocus
 ├── contract/
 │   ├── test_waveform_interface.py
 │   ├── test_algorithm_interface.py

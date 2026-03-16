@@ -215,20 +215,77 @@
 
 ### Tests for User Story 5a
 
-- [ ] T088 [P] [US5a] Integration test for PGA autofocus (convergence, phase error estimation) in `tests/integration/test_moco.py`
-- [ ] T089 [P] [US5a] Integration test for MDA autofocus in `tests/integration/test_moco.py`
-- [ ] T090 [P] [US5a] Integration test for MinimumEntropy autofocus in `tests/integration/test_moco.py`
-- [ ] T091 [P] [US5a] Integration test for PPP autofocus in `tests/integration/test_moco.py`
+- [x] T088 [P] [US5a] Integration test for PGA autofocus (convergence, phase error estimation) in `tests/integration/test_moco.py`
+- [x] T089 [P] [US5a] Integration test for MDA autofocus in `tests/integration/test_moco.py`
+- [x] T090 [P] [US5a] Integration test for MinimumEntropy autofocus in `tests/integration/test_moco.py`
+- [x] T091 [P] [US5a] Integration test for PPP autofocus in `tests/integration/test_moco.py`
 
 ### Implementation for User Story 5a
 
-- [ ] T092 [US5a] Implement PhaseGradientAutofocus (dominant scatterer selection, phase gradient estimation, iterative correction) in `pySimSAR/algorithms/autofocus/pga.py`
-- [ ] T093 [P] [US5a] Implement MapDriftAutofocus (sub-aperture splitting, drift measurement, low-order phase estimation) in `pySimSAR/algorithms/autofocus/mda.py`
-- [ ] T094 [P] [US5a] Implement MinimumEntropyAutofocus (entropy optimization, polynomial phase model) in `pySimSAR/algorithms/autofocus/min_entropy.py`
-- [ ] T095 [P] [US5a] Implement ProminentPointProcessing (scatterer identification, phase history extraction, error estimation) in `pySimSAR/algorithms/autofocus/ppp.py`
-- [ ] T096 [US5a] Register all autofocus algorithms in `pySimSAR/algorithms/autofocus/__init__.py`
+- [x] T092 [US5a] Implement PhaseGradientAutofocus (dominant scatterer selection, phase gradient estimation, iterative correction) in `pySimSAR/algorithms/autofocus/pga.py`
+- [x] T093 [P] [US5a] Implement MapDriftAutofocus (sub-aperture splitting, drift measurement, low-order phase estimation) in `pySimSAR/algorithms/autofocus/mda.py`
+- [x] T094 [P] [US5a] Implement MinimumEntropyAutofocus (entropy optimization, polynomial phase model) in `pySimSAR/algorithms/autofocus/min_entropy.py`
+- [x] T095 [P] [US5a] Implement ProminentPointProcessing (scatterer identification, phase history extraction, error estimation) in `pySimSAR/algorithms/autofocus/ppp.py`
+- [x] T096 [US5a] Register all autofocus algorithms in `pySimSAR/algorithms/autofocus/__init__.py`
 
 **Checkpoint**: All 4 autofocus algorithms produce measurably sharper images. PGA converges on known phase errors within threshold.
+
+---
+
+## Phase 8.5: Parameter Sets, Model Enhancements, and Golden Tests
+
+**Purpose**: Add parameter set I/O, receiver gain model, RCS model interface, antenna presets, reusable component presets, binary data visualization tool, and three golden reference test cases. See design spec: `docs/superpowers/specs/2026-03-16-parameter-sets-and-golden-tests-design.md`.
+
+**Dependencies**: Depends on Phase 8 (needs all simulation + processing infrastructure in place). Must be complete before Phase 9 (golden tests validate end-to-end pipeline including image formation).
+
+### Model Enhancements
+
+- [ ] T096a Unit test for Radar with receiver_gain_dB (cascade noise figure, updated noise_power) in `tests/unit/test_radar.py`
+- [ ] T096b Unit test for RCSModel ABC and StaticRCS in `tests/unit/test_rcs_model.py`
+- [ ] T096c Unit test for PointTarget with rcs_model parameter in `tests/unit/test_scene.py`
+- [ ] T096d Implement RCSModel ABC and StaticRCS in `pySimSAR/core/rcs_model.py`
+- [ ] T096e Add receiver_gain_dB to Radar (constructor, total_noise_figure property, updated noise_power) in `pySimSAR/core/radar.py`
+- [ ] T096f Update compute_path_loss and compute_target_echo to propagate receiver_gain_dB in `pySimSAR/simulation/signal.py`
+- [ ] T096g Update SimulationEngine to pass radar.receiver_gain through signal computation in `pySimSAR/simulation/engine.py`
+- [ ] T096h Add rcs_model parameter to PointTarget (defaults to StaticRCS) in `pySimSAR/core/scene.py`
+- [ ] T096i Extend ProcessingConfig with per-algorithm *_params dicts in `pySimSAR/io/config.py`
+
+### Antenna Presets
+
+- [ ] T096j Unit test for antenna preset factory (flat, sinc, gaussian patterns, 3 dB beamwidth verification) in `tests/unit/test_radar.py`
+- [ ] T096k Implement create_antenna_from_preset() factory function (flat with -60 dB floor, sinc with 0.886 factor and -60 dB floor, gaussian with K=12) in `pySimSAR/core/radar.py`
+
+### Parameter Set I/O
+
+- [ ] T096l [P] Unit test for resolve_refs ($ref JSON loading, $data .npy/.npz/.csv loading, circular ref detection, sibling key error) in `tests/unit/test_parameter_set.py`
+- [ ] T096m [P] Unit test for load_parameter_set (unit suffix stripping, degree-to-radian conversion, geographic coord exemption, format_version check) in `tests/unit/test_parameter_set.py`
+- [ ] T096n [P] Unit test for build_simulation (object construction from resolved params, window name-to-callable factory, algorithm registry lookup, user module dynamic import) in `tests/unit/test_parameter_set.py`
+- [ ] T096o [P] Unit test for save_parameter_set (round-trip: save then load, inline vs bulk point target threshold, $ref structure) in `tests/unit/test_parameter_set.py`
+- [ ] T096p Implement resolve_refs (recursive $ref and $data resolution with visited-path cycle detection) in `pySimSAR/io/parameter_set.py`
+- [ ] T096q Implement load_parameter_set (load project.json, resolve refs, strip unit suffixes, convert degrees, validate structure) in `pySimSAR/io/parameter_set.py`
+- [ ] T096r Implement build_simulation (construct Scene, Radar, Platform, engine kwargs, ProcessingConfig from resolved dict; window factory; antenna preset factory; algorithm param schema validation) in `pySimSAR/io/parameter_set.py`
+- [ ] T096s Implement save_parameter_set (serialize objects to project directory with $ref links, .npy for large arrays, inline for small targets <= 20) in `pySimSAR/io/parameter_set.py`
+
+### Reusable Presets
+
+- [ ] T096t [P] Create shipped antenna presets (flat_default.json, sinc_xband.json, gaussian_default.json) in `pySimSAR/presets/antennas/`
+- [ ] T096u [P] Create shipped waveform presets (lfm_xband_150mhz.json, lfm_cband_50mhz.json, fmcw_wband_1ghz.json) in `pySimSAR/presets/waveforms/`
+- [ ] T096v [P] Create shipped sensor presets (tactical_gps.json, rtk_gps.json, mems_imu.json, navigation_imu.json) in `pySimSAR/presets/sensors/`
+- [ ] T096w [P] Create shipped platform presets (airborne_100mps.json, uav_30mps.json) in `pySimSAR/presets/platforms/`
+
+### Binary Data Visualization Tool
+
+- [ ] T096x Unit test for view_array CLI tool (1D line plot, 2D real imshow, 2D complex mag+phase, .npz key selection, positions scatter) in `tests/unit/test_view_array.py`
+- [ ] T096y Implement view_array CLI tool (argparse, shape-based display, --key, --slice, --cmap, --save options) in `pySimSAR/tools/view_array.py`
+
+### Golden Reference Test Cases
+
+- [ ] T096z1 Create golden test case 1: single_point_stripmap (project.json, scene, radar, waveform, antenna, platform JSONs, README.md with analytical calculations) in `tests/golden/single_point_stripmap/`
+- [ ] T096z2 Create golden test case 2: multi_target_spotlight (3 targets, Omega-K, Hamming window, sinc antenna, README.md with analytical calculations) in `tests/golden/multi_target_spotlight/`
+- [ ] T096z3 Create golden test case 3: motion_moco_autofocus (Dryden turbulence, first-order MoCo, PGA, README.md with analytical calculations) in `tests/golden/motion_moco_autofocus/`
+- [ ] T096z4 Implement golden test runner (load parameter set, build simulation, run, image formation, validate against analytical expectations) in `tests/integration/test_golden.py`
+
+**Checkpoint**: Parameter sets save/load round-trip correctly. Receiver gain cascade noise model verified. Antenna presets produce correct beam patterns. All 3 golden test cases pass end-to-end with analytical validation. view_array tool displays arrays correctly.
 
 ---
 
@@ -352,9 +409,10 @@
 - **Phase 6 (US4)**: Depends on Phase 3 (needs RawData)
 - **Phase 7 (US5)**: Depends on Phase 3 and Phase 4 (needs RawData + NavData)
 - **Phase 8 (US5a)**: Depends on Phase 6 (needs two-step image formation)
-- **Phase 9 (US6)**: Depends on Phase 6 (needs SARImage)
+- **Phase 8.5 (Param Sets)**: Depends on Phase 8 (needs full sim + processing infra); BLOCKS Phase 9 (golden tests validate pipeline)
+- **Phase 9 (US6)**: Depends on Phase 6 and Phase 8.5 (needs SARImage + parameter set I/O)
 - **Phase 10 (US7)**: Depends on Phase 6 (needs quad-pol SARImages)
-- **Phase 11 (US8)**: Depends on Phases 6-10 (orchestrates all algorithms)
+- **Phase 11 (US8)**: Depends on Phases 6-10 and Phase 8.5 (orchestrates all algorithms with parameter-driven config)
 - **Phase 12 (US9)**: Depends on Phase 11 (GUI wraps the pipeline)
 - **Phase 13 (Polish)**: Depends on all prior phases
 
@@ -374,12 +432,14 @@
 Phase 2 (Foundational)
     ├──→ Phase 3 (US1: Signal) ──┬──→ Phase 5 (US3: I/O)
     │                            ├──→ Phase 6 (US4: Image Formation) ──┬──→ Phase 8 (US5a: Autofocus)
-    │                            │                                     ├──→ Phase 9 (US6: Geocoding)
+    │                            │                                     ├──→ Phase 8.5 (Param Sets + Golden Tests)
+    │                            │                                     │      ├──→ Phase 9 (US6: Geocoding)
+    │                            │                                     │      └──→ Phase 11 (US8: Pipeline)
     │                            │                                     └──→ Phase 10 (US7: PolSAR)
     └──→ Phase 4 (US2: Motion) ──┼──→ Phase 5 (US3: I/O)
                                  └──→ Phase 7 (US5: MoCo) ──→ Phase 8 (US5a: Autofocus)
 
-All above ──→ Phase 11 (US8: Pipeline) ──→ Phase 12 (US9: GUI) ──→ Phase 13 (Polish)
+Phase 11 (US8: Pipeline) ──→ Phase 12 (US9: GUI) ──→ Phase 13 (Polish)
 ```
 
 ---
@@ -399,10 +459,11 @@ All above ──→ Phase 11 (US8: Pipeline) ──→ Phase 12 (US9: GUI) ─�
 2. Phase 4 → Motion/sensor modeling (parallel with Phase 3)
 3. Phase 5 → Data I/O (save/load everything)
 4. Phase 6-8 → Image formation + MoCo + Autofocus
-5. Phase 9-10 → Geocoding + PolSAR
-6. Phase 11 → Pipeline orchestration
-7. Phase 12 → GUI
-8. Phase 13 → Polish
+5. Phase 8.5 → Parameter sets, model enhancements, golden tests
+6. Phase 9-10 → Geocoding + PolSAR
+7. Phase 11 → Pipeline orchestration
+8. Phase 12 → GUI
+9. Phase 13 → Polish
 
 ---
 

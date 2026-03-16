@@ -380,7 +380,10 @@ all visualization panels display correct data.
   varying reflectivity in 3D space.
 - **FR-003**: System MUST model configurable radar parameters: carrier
   frequency, bandwidth, pulse repetition frequency, antenna pattern,
-  transmit power, noise figure, system losses, and reference temperature.
+  transmit power, receiver gain, noise figure, system losses, and
+  reference temperature. The receiver signal chain is: antenna → passive
+  system losses (L_sys) → receiver (G_rx, NF_rx). Total system noise
+  figure follows Friis cascade: F_total = L_sys × F_rx.
 - **FR-003a**: System MUST support modular radar waveforms via a unified
   interface where each waveform handles both signal generation and range
   compression internally. Built-in waveforms MUST include LFM (pulsed)
@@ -411,9 +414,16 @@ all visualization panels display correct data.
   power, two-way antenna gain, wavelength, target RCS, and range.
   System losses MUST be applied as an aggregate attenuation factor.
 - **FR-003g**: The simulation engine MUST add receiver thermal noise to
-  the raw echo data based on the radar's noise figure, reference
-  temperature, and receiver bandwidth (noise power = k·T·B·F). The
-  noise MUST be complex Gaussian (I and Q channels).
+  the raw echo data based on the total system noise figure (Friis
+  cascade of system losses and receiver noise figure), reference
+  temperature, and matched filter noise bandwidth
+  (noise power = k·T·B·F_total·G_rx). The noise MUST be complex
+  Gaussian (I and Q channels).
+- **FR-003h**: System MUST support pluggable point target RCS fluctuation
+  models via a standard interface (RCSModel ABC). The default
+  implementation MUST provide a static (non-fluctuating) model. Future
+  models (Swerling cases 1-4) can be added as modules without modifying
+  existing code.
 - **FR-004**: System MUST generate platform trajectories with configurable
   nominal path (velocity, altitude, heading) and motion perturbation
   models (turbulence spectrum, vibration, drift).
@@ -457,11 +467,31 @@ all visualization panels display correct data.
 - **FR-013**: All functionality accessible through the GUI MUST also be
   accessible through the Python API.
 - **FR-014**: System MUST support saving and loading complete simulation
-  and processing configurations for reproducibility. SimulationConfig
-  (scene, radar, platform, seed) and ProcessingConfig (algorithm
-  selections and parameters) MUST be independently serializable so that
-  the same raw data can be re-processed with different algorithms
-  without re-running the simulation.
+  and processing configurations as parameter set project directories
+  for reproducibility. A parameter set is a directory containing a main
+  project.json with `$ref` links to modular component JSON files
+  (scene, radar, waveform, antenna, platform, processing) and `$data`
+  references to binary array files (.npy/.npz) for large data
+  (reflectivity maps, scattering matrices, measured antenna patterns,
+  bulk point targets). SimulationConfig and ProcessingConfig MUST be
+  independently serializable so that the same raw data can be
+  re-processed with different algorithms without re-running the
+  simulation. ProcessingConfig MUST carry per-algorithm parameter
+  dicts alongside algorithm names.
+- **FR-014a**: System MUST ship reusable default parameter presets for
+  common components (antennas, waveforms, sensors, platforms) under
+  `pySimSAR/presets/`. Users can reference presets via `$ref` with a
+  `$preset` path prefix.
+- **FR-014b**: System MUST provide named antenna pattern presets
+  ("flat", "sinc", "gaussian") that are constructed programmatically
+  from JSON parameters (beamwidth, peak gain) without storing array
+  data. Measured antenna patterns MUST also be loadable from .npz files.
+- **FR-014c**: Algorithm configuration files MUST support a
+  `parameter_schema()` classmethod on algorithm ABCs that declares
+  expected parameters, types, defaults, and descriptions. User-written
+  algorithms MUST be loadable via a `module` field specifying the
+  Python import path, enabling external algorithm modules without
+  modifying core code.
 - **FR-015**: System MUST support stripmap, spotlight, and scan-SAR
   imaging modes, including appropriate beam steering models and
   mode-specific signal generation for each.
@@ -531,6 +561,13 @@ all visualization panels display correct data.
 - **ClutterModel**: A pluggable module that generates statistical
   reflectivity distributions for distributed targets (e.g.,
   K-distribution for sea/terrain clutter).
+- **RCSModel**: A pluggable module that applies statistical fluctuation
+  to point target RCS values. Default: static (non-fluctuating).
+  Future: Swerling case 1-4 models.
+- **ParameterSet**: A project directory containing JSON configuration
+  files and binary array data files that fully describe a simulation
+  and processing setup. Supports `$ref` (JSON cross-references) and
+  `$data` (binary array loading) for modular, reusable configurations.
 
 ## Success Criteria *(mandatory)*
 
