@@ -837,78 +837,195 @@ Three parameter set directories under `tests/golden/`, each containing a complet
 
 ### 7.1 Case 1: `single_point_stripmap`
 
-**Purpose:** Simplest possible end-to-end validation. One point target, ideal flight, stripmap mode.
+**Purpose:** Simplest end-to-end validation. One point target, ideal flight, no windowing, stripmap RDA.
+
+**Geometry:**
+
+```
+                    Platform (0, y, 2000) ──▶ North (y+)
+                    │
+                    │  45° depression
+                    │ ╲
+           2000 m   │   ╲  R₀ = 2828.4 m
+                    │    ╲
+                    │     ╲
+         ───────────┴──────● Target (2000, 0, 0)
+                   2000 m East (x+)
+```
+
+Platform flies North at altitude 2000 m. Beam looks right (East) at 45° depression.
+Target at **(2000, 0, 0)** ENU — 2000 m East on the ground, placing it at beam center.
+Slant range at broadside: R₀ = sqrt(2000² + 2000²) = **2828.4 m**.
 
 **Configuration:**
-- Scene: single point target at (0, 0, 0) ENU, RCS = 1.0 m^2, static
-- Radar: X-band (9.65 GHz), PRF 1000 Hz, 1 kW, single-pol
-- Waveform: LFM, 150 MHz bandwidth, 10% duty cycle, no window
-- Antenna: flat preset, 3 deg az, 10 deg el, 30 dB gain
-- Platform: 100 m/s, 2000 m altitude, heading North, no perturbation, no sensors
-- Simulation: 256 pulses, seed 42
-- Processing: Range-Doppler algorithm, no MoCo, no autofocus
 
-**README.md analytical calculations:**
-- Theoretical range resolution: `delta_R = c / (2 * B) = 1.0 m`
-- Theoretical azimuth resolution: `delta_az = D / 2` where `D = lambda / bw_az` (antenna length from beamwidth)
-- Expected slant range to target
-- Expected Doppler bandwidth
-- Expected SNR from radar equation
-- Phase at target: `-4*pi*fc*R/c`
+| Component | Parameter | Value |
+|-----------|-----------|-------|
+| Scene | target position | (2000, 0, 0) ENU meters |
+| | target RCS | 1.0 m² |
+| | rcs_model | static |
+| Radar | carrier_freq | 9.65 GHz → λ = 0.03107 m |
+| | PRF | 1000 Hz |
+| | transmit_power | 1000 W |
+| | receiver_gain | 0 dB |
+| | noise_figure | 3.0 dB |
+| | system_losses | 2.0 dB |
+| | polarization | single |
+| | mode | stripmap |
+| | look_side | right |
+| | depression_angle | 45° |
+| | squint_angle | 0° |
+| Waveform | type | LFM, 150 MHz BW, 10% duty, no window |
+| Antenna | preset | flat, 3° az, 10° el, 30 dB |
+| Platform | velocity | 100 m/s North |
+| | altitude | 2000 m |
+| | start_position | (0, -12.8, 2000) — centers aperture on target azimuth |
+| | perturbation | none |
+| | sensors | none |
+| Simulation | n_pulses | 256, seed 42, sample_rate auto (2× BW = 300 MHz) |
+| Processing | image_formation | range_doppler, no MoCo, no autofocus |
+
+**Analytical calculations:**
+
+| Quantity | Formula | Value |
+|----------|---------|-------|
+| Wavelength | c / f_c | 0.03107 m |
+| Slant range (broadside) | sqrt(2000² + 2000²) | 2828.4 m |
+| Pulse spacing | v / PRF | 0.1 m |
+| Aperture length | n_pulses × pulse_spacing | 25.6 m |
+| **Range resolution** | c / (2B) | **1.0 m** |
+| Beam footprint (azimuth) | R₀ × θ_az = 2828.4 × 0.05236 | 148.2 m |
+| Target illuminated? | 25.6 m < 148.2 m → all 256 pulses | yes |
+| **Azimuth resolution** | λR₀ / (2 × L_sa) = 0.03107 × 2828.4 / (2 × 25.6) | **1.72 m** |
+| Azimuth bandwidth | v / δ_az | 58.3 Hz (well below PRF) |
+| Single-pulse SNR | P_t G² λ² σ / ((4π)³ R⁴ L × kTBF) | ~6 dB |
+| Integrated SNR | SNR_1 + 10log₁₀(256) | ~30 dB |
+| Echo phase (broadside) | -4πf_c R₀/c | deterministic (verify < 0.01 rad error) |
 
 **Pass criteria:**
-- Phase accuracy < 0.01 rad
-- 3 dB impulse response width within 5% of theoretical for both range and azimuth
-- Target detected at correct range-azimuth position
+
+1. Echo phase at broadside pulse matches analytical `-4πf_c R₀/c` within **0.01 rad**
+2. Range IRW (3 dB width) within **5%** of 1.0 m
+3. Azimuth IRW (3 dB width) within **5%** of 1.72 m
+4. Target peak at correct range-azimuth bin position
 
 ### 7.2 Case 2: `multi_target_spotlight`
 
-**Purpose:** Multiple targets at different positions, spotlight mode, sinc antenna, testing spatial separation and relative amplitudes.
+**Purpose:** Multiple targets, spotlight mode, windowed resolution, sinc antenna pattern, relative amplitude validation.
+
+**Geometry:**
+
+```
+        Platform (0, y, 3000) ──▶ North
+              ╲  45° depression
+               ╲
+                ╲  R ≈ 4243 m
+                 ╲
+    ──────────────●──────── Ground (z=0)
+              3000 m East
+
+    Targets (3000 m cross-track baseline):
+      T1: (2950, -30, 0)  RCS=1 m²   (near range, offset azimuth)
+      T2: (3000,   0, 0)  RCS=5 m²   (scene center)
+      T3: (3060,  40, 0)  RCS=10 m²  (far range, offset azimuth)
+```
 
 **Configuration:**
-- Scene: 3 point targets at distinct range-azimuth positions, different RCS values (1, 5, 10 m^2), static
-- Radar: X-band (9.65 GHz), PRF 2000 Hz, 1 kW, single-pol
-- Waveform: LFM, 300 MHz bandwidth, 10% duty cycle, Hamming window
-- Antenna: sinc preset, 5 deg az, 15 deg el, 30 dB gain
-- Platform: 100 m/s, 3000 m altitude, heading North, no perturbation
-- Simulation: 512 pulses, seed 42, scene_center at mid-target position
-- Processing: Omega-K algorithm (supports spotlight), no MoCo, no autofocus
 
-**README.md analytical calculations:**
-- Range resolution with Hamming window (broadened by ~1.5x)
-- Azimuth resolution in spotlight mode (extended synthetic aperture)
-- Expected relative amplitudes (RCS ratio + range difference + antenna gain variation)
-- Target separability conditions
+| Component | Parameter | Value |
+|-----------|-----------|-------|
+| Scene | target T1 | pos=(2950, -30, 0), rcs=1.0 m² |
+| | target T2 | pos=(3000, 0, 0), rcs=5.0 m² |
+| | target T3 | pos=(3060, 40, 0), rcs=10.0 m² |
+| | all rcs_model | static |
+| Radar | carrier_freq | 9.65 GHz → λ = 0.03107 m |
+| | PRF | 2000 Hz |
+| | transmit_power | 1000 W |
+| | receiver_gain | 0 dB |
+| | noise_figure | 3.0 dB, system_losses 2.0 dB |
+| | polarization | single |
+| | mode | **spotlight** |
+| | look_side | right, depression_angle 45° |
+| Waveform | type | LFM, **300 MHz** BW, 10% duty, **Hamming window** |
+| Antenna | preset | **sinc**, 5° az, 15° el, 30 dB |
+| Platform | velocity | 100 m/s North, **3000 m** altitude |
+| | start_position | (0, -6.4, 3000) |
+| | perturbation | none |
+| Simulation | n_pulses | 512, seed 42, scene_center=(3000, 0, 0) |
+| Processing | image_formation | **omega_k**, no MoCo, no autofocus |
+
+**Analytical calculations:**
+
+| Quantity | Formula | Value |
+|----------|---------|-------|
+| Slant range to T2 (center) | sqrt(3000² + 3000²) | 4243 m |
+| **Range resolution (Hamming)** | 1.5 × c/(2B) = 1.5 × 0.5 m | **0.75 m** |
+| Integration time | 512 / 2000 | 0.256 s |
+| Traverse length | 100 × 0.256 | 25.6 m |
+| Angular subtent | L / R = 25.6 / 4243 | 0.00603 rad |
+| **Azimuth resolution (spotlight)** | λ / (4 × Δθ) | **1.29 m** |
+| T1-T2 range separation | ~50 m >> 0.75 m | well resolved |
+| T1-T2 azimuth separation | ~30 m >> 1.29 m | well resolved |
+| Expected amplitude ratio T3/T2 | sqrt(10/5) × (R_T2/R_T3)² × G_ratio | ~1.34 (~2.5 dB) |
+| Expected amplitude ratio T2/T1 | sqrt(5/1) × (R_T1/R_T2)² × G_ratio | ~2.18 (~6.8 dB) |
+
+Note: Sinc antenna pattern means targets at different azimuth angles from beam center
+will have different gains — this must be accounted for in the amplitude comparison.
 
 **Pass criteria:**
-- All 3 targets resolved (peaks separated and identifiable)
-- Relative peak amplitudes match expected RCS ratios within 1 dB (after range and antenna corrections)
-- Impulse response width within 10% of windowed theoretical resolution
+
+1. All 3 targets **resolved** as separate peaks
+2. Relative peak amplitudes match expected values within **1 dB** (corrected for range and antenna gain differences)
+3. Range IRW within **10%** of 0.75 m (Hamming-windowed)
+4. Azimuth IRW within **10%** of 1.29 m
 
 ### 7.3 Case 3: `motion_moco_autofocus`
 
-**Purpose:** Validate motion compensation and autofocus pipeline with realistic motion errors.
+**Purpose:** Validate the full correction chain: simulation with motion errors → MoCo → autofocus → focused image. Tests that the pipeline recovers image quality.
+
+**Geometry:** Same as Case 1 (single target at (2000, 0, 0), 45° depression, stripmap), but with motion perturbation and 512 pulses.
 
 **Configuration:**
-- Scene: single point target at (0, 0, 0), RCS = 10.0 m^2, static
-- Radar: X-band (9.65 GHz), PRF 1000 Hz, 1 kW, single-pol
-- Waveform: LFM, 150 MHz bandwidth, 10% duty cycle, no window
-- Antenna: gaussian preset, 3 deg az, 10 deg el, 30 dB gain
-- Platform: 100 m/s, 2000 m altitude, heading North, Dryden turbulence (sigma_u=1.5, sigma_v=1.5, sigma_w=0.75), tactical GPS (1m RMS, 10 Hz), MEMS IMU
-- Simulation: 512 pulses, seed 42
-- Processing: Range-Doppler, first-order MoCo, PGA autofocus
 
-**README.md analytical calculations:**
-- Expected RMS motion error from Dryden model
-- Expected phase error from motion (4*pi*dR/lambda)
-- Expected PMR degradation without MoCo
-- Expected PMR improvement after first-order MoCo
-- Expected further improvement after PGA
+| Component | Parameter | Value |
+|-----------|-----------|-------|
+| Scene | target position | (2000, 0, 0) ENU |
+| | target RCS | **10.0 m²** (higher for better SNR margin) |
+| | rcs_model | static |
+| Radar | same as Case 1 (9.65 GHz, 1000 Hz PRF, 1 kW, single, stripmap, right, 45°) |
+| Waveform | LFM, 150 MHz, 10% duty, no window |
+| Antenna | preset **gaussian**, 3° az, 10° el, 30 dB |
+| Platform | 100 m/s North, 2000 m altitude |
+| | start_position | (0, -25.6, 2000) |
+| | **perturbation** | **Dryden(σ_u=1.5, σ_v=1.5, σ_w=0.75)** |
+| | **sensors** | GPS(1.0 m RMS, 10 Hz, gaussian), IMU(0.003 VRW, 0.0005 ARW, 100 Hz, white_noise) |
+| Simulation | **512 pulses**, seed 42 |
+| Processing | RDA, **first_order MoCo**, **PGA autofocus** |
+
+**Test methodology:** The test runs the pipeline **three times** with the same scene:
+
+1. **Baseline (ideal)**: Simulate with no perturbation → RDA → measure PMR
+2. **Degraded**: Simulate with Dryden perturbation → RDA (no MoCo) → measure PMR
+3. **Corrected**: Same perturbed data → first-order MoCo → PGA → RDA → measure PMR
+
+**Analytical expectations:**
+
+| Stage | Quantity | Expected |
+|-------|----------|----------|
+| No MoCo | Phase error from dR | 4π × dR / λ — can be many radians over aperture |
+| | PMR degradation | > 5 dB below ideal case (motion spreads sidelobes) |
+| After MoCo | Residual phase error | Bulk correction removes scene-center component |
+| | PMR improvement | > 5 dB over no-MoCo case |
+| After MoCo + PGA | Residual phase error | Data-driven correction of remaining errors |
+| | PMR vs ideal | Within 3 dB of no-perturbation case |
 
 **Pass criteria:**
-- Image without MoCo shows degraded PMR (> 5 dB below ideal)
-- After MoCo: PMR improves by > 5 dB
-- After MoCo + autofocus: PMR within 3 dB of ideal (no-perturbation case)
+
+1. **Degraded PMR** is at least **5 dB worse** than baseline
+2. **After MoCo**: PMR improves by at least **5 dB** over degraded
+3. **After MoCo + PGA**: PMR within **3 dB** of baseline (ideal)
+
+**Open items for post-implementation review:** Target positions, target separation distances, Dryden turbulence intensity, n_pulses vs resolution trade-offs — to be reviewed and tuned after Phase 8.5 implementation.
 
 ### 7.4 Test Runner
 
