@@ -150,8 +150,11 @@ class DrydenTurbulence(MotionPerturbation):
             target_power = n_samples**2 * psd * df
             spectrum = np.zeros(n_rfft, dtype=complex)
 
-            # DC and Nyquist: real-valued
-            spectrum[0] = rng.normal(0, np.sqrt(target_power[0]))
+            # DC must be zero — perturbations are zero-mean by definition.
+            # A nonzero DC produces a constant velocity offset that integrates
+            # into linear position drift, masking the oscillatory turbulence.
+            spectrum[0] = 0.0
+            # Nyquist: real-valued
             spectrum[-1] = rng.normal(0, np.sqrt(target_power[-1]))
 
             # Interior bins: complex Gaussian

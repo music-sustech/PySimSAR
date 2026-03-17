@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Union
 
 import numpy as np
 
+from pySimSAR.core.rcs_model import RCSModel, StaticRCS
+
 if TYPE_CHECKING:
     from pySimSAR.clutter.base import ClutterModel
 
@@ -29,6 +31,7 @@ class PointTarget:
         position: np.ndarray,
         rcs: float | np.ndarray,
         velocity: np.ndarray | None = None,
+        rcs_model: RCSModel | None = None,
     ) -> None:
         position = np.asarray(position, dtype=float)
         if position.shape != (3,):
@@ -60,6 +63,7 @@ class PointTarget:
             if not np.all(np.isfinite(velocity)):
                 raise ValueError("velocity must contain only finite values")
         self._velocity = velocity
+        self._rcs_model = rcs_model if rcs_model is not None else StaticRCS()
 
     @property
     def position(self) -> np.ndarray:
@@ -75,6 +79,11 @@ class PointTarget:
     def velocity(self) -> np.ndarray | None:
         """Target velocity in m/s, or None."""
         return self._velocity
+
+    @property
+    def rcs_model(self) -> RCSModel:
+        """RCS fluctuation model."""
+        return self._rcs_model
 
 
 class DistributedTarget:

@@ -1,0 +1,22 @@
+{
+  "format_version": "1.0",
+  "name": "Golden Case 1: Single Point Target, Stripmap",
+  "description": "Simplest end-to-end validation. One point target, ideal flight, no windowing, stripmap RDA.",
+  "scene": { "$ref": "scene.json" },
+  "radar": { "$ref": "radar.json" },
+  "platform": { "$ref": "platform.json" },
+  "simulation": {
+    "n_pulses": 256,
+    "seed": 42,
+    "sample_rate_hz": null,
+    "scene_center_m": null,
+    "swath_range_m": [2600, 3100],
+    "n_subswaths": 3,
+    "burst_length": 20
+  },
+  "processing": {
+    "image_formation": { "algorithm": "range_doppler", "params": {} },
+    "moco": null,
+    "autofocus": null
+  }
+}

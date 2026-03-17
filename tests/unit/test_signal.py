@@ -152,3 +152,106 @@ class TestEchoPhaseAccuracy:
         # Peak should be at index 0 (zero delay)
         peak_idx = np.argmax(np.abs(compressed))
         assert peak_idx == 0
+
+
+class TestMemoryEstimation:
+    """Tests for SimulationEngine.estimate_memory (T128)."""
+
+    def test_estimate_memory_single_pol(self, radar):
+        """Memory estimate for single-pol matches analytical calculation."""
+        from pySimSAR.core.scene import Scene
+        from pySimSAR.simulation.engine import SimulationEngine
+
+        scene = Scene(origin_lat=0.0, origin_lon=0.0, origin_alt=0.0)
+        scene.add_target(PointTarget(position=[5000, 0, 0], rcs=1.0))
+
+        engine = SimulationEngine(
+            scene=scene,
+            radar=radar,
+            n_pulses=256,
+            swath_range=(4500.0, 5500.0),
+        )
+
+        n_range = engine._compute_n_range_samples()
+        n_channels = 1  # single pol
+        expected = 256 * n_range * n_channels * 16 * 3  # echo + 2x working
+
+        estimate = engine.estimate_memory()
+        assert estimate == expected
+
+    def test_estimate_memory_quad_pol(self):
+        """Memory estimate for quad-pol is 4x single-pol echo size."""
+        from pySimSAR.core.scene import Scene
+        from pySimSAR.simulation.engine import SimulationEngine
+
+        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+        antenna = _make_antenna()
+        quad_radar = Radar(
+            carrier_freq=9.65e9,
+            prf=1000.0,
+            transmit_power=100.0,
+            waveform=wf,
+            antenna=antenna,
+            polarization="quad",
+            mode="stripmap",
+            look_side="right",
+            depression_angle=0.7,
+        )
+
+        scene = Scene(origin_lat=0.0, origin_lon=0.0, origin_alt=0.0)
+        scene.add_target(PointTarget(position=[5000, 0, 0], rcs=1.0))
+
+        engine = SimulationEngine(
+            scene=scene,
+            radar=quad_radar,
+            n_pulses=128,
+            swath_range=(4500.0, 5500.0),
+        )
+
+        n_range = engine._compute_n_range_samples()
+        n_channels = 4
+        expected = 128 * n_range * n_channels * 16 * 3
+
+        estimate = engine.estimate_memory()
+        assert estimate == expected
+
+    def test_estimate_memory_warns_large(self):
+        """Warning is issued when estimated memory exceeds 1 GB."""
+        from pySimSAR.core.scene import Scene
+        from pySimSAR.simulation.engine import SimulationEngine
+
+        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+        antenna = _make_antenna()
+        r = Radar(
+            carrier_freq=9.65e9,
+            prf=1000.0,
+            transmit_power=100.0,
+            waveform=wf,
+            antenna=antenna,
+            polarization="quad",
+            mode="stripmap",
+            look_side="right",
+            depression_angle=0.7,
+        )
+
+        scene = Scene(origin_lat=0.0, origin_lon=0.0, origin_alt=0.0)
+        scene.add_target(PointTarget(position=[5000, 0, 0], rcs=1.0))
+
+        engine = SimulationEngine(
+            scene=scene,
+            radar=r,
+            n_pulses=100_000,
+            swath_range=(4000.0, 6000.0),
+        )
+
+        with pytest.warns(ResourceWarning, match="Estimated memory usage"):
+            engine.estimate_memory()
+
+    def test_format_memory_size(self):
+        """format_memory_size produces correct human-readable strings."""
+        from pySimSAR.simulation.engine import SimulationEngine
+
+        assert SimulationEngine.format_memory_size(500) == "500 bytes"
+        assert SimulationEngine.format_memory_size(2048) == "2.00 KB"
+        assert SimulationEngine.format_memory_size(5 * 1024**2) == "5.00 MB"
+        assert SimulationEngine.format_memory_size(2.5 * 1024**3) == "2.50 GB"

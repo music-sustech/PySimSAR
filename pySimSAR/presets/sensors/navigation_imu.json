@@ -1,0 +1,7 @@
+{
+  "type": "imu",
+  "accel_noise_density": 0.0001,
+  "gyro_noise_density": 0.00001,
+  "sample_rate_hz": 200.0,
+  "error_model": {"type": "white_noise"}
+}

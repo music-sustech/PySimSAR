@@ -83,6 +83,24 @@ class TestPointTarget:
                 velocity=[np.inf, 0.0, 0.0],
             )
 
+    def test_default_rcs_model_is_static(self):
+        """Default rcs_model is StaticRCS."""
+        from pySimSAR.core.rcs_model import StaticRCS
+        pt = PointTarget(position=[0.0, 0.0, 0.0], rcs=1.0)
+        assert isinstance(pt.rcs_model, StaticRCS)
+
+    def test_custom_rcs_model(self):
+        """Custom rcs_model is stored correctly."""
+        from pySimSAR.core.rcs_model import RCSModel
+        class MockRCSModel(RCSModel):
+            name = "mock"
+            def apply(self, rcs, seed=None):
+                return rcs * 2.0
+        model = MockRCSModel()
+        pt = PointTarget(position=[0.0, 0.0, 0.0], rcs=5.0, rcs_model=model)
+        assert pt.rcs_model is model
+        assert pt.rcs_model.apply(5.0) == 10.0
+
 
 # ---------------------------------------------------------------------------
 # DistributedTarget tests

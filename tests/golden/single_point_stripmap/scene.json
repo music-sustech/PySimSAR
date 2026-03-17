@@ -1,0 +1,13 @@
+{
+  "origin_lat_deg": 34.05,
+  "origin_lon_deg": -118.25,
+  "origin_alt_m": 0.0,
+  "point_targets": [
+    {
+      "position_m": [2000, 0, 0],
+      "rcs_m2": 1.0,
+      "rcs_model": { "type": "static" },
+      "velocity_mps": null
+    }
+  ]
+}

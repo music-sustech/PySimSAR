@@ -6,6 +6,7 @@ polarimetric channel handling, and SAR mode dispatch.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -53,6 +54,9 @@ class SimulationResult:
         True (perturbed) trajectory used for echo computation.
     navigation_data : list | None
         Navigation sensor measurements (one per sensor).
+    gate_delay : float
+        Range gate start delay in seconds. The first range sample
+        corresponds to this round-trip delay.
     """
 
     echo: dict[str, np.ndarray] = field(default_factory=dict)
@@ -63,6 +67,7 @@ class SimulationResult:
     ideal_trajectory: object | None = None
     true_trajectory: object | None = None
     navigation_data: list | None = None
+    gate_delay: float = 0.0
 
     def save(self, filepath: str, *, radar: object | None = None, **kwargs) -> None:
         """Save simulation results to HDF5.
@@ -103,6 +108,7 @@ class SimulationResult:
                 prf=prf,
                 waveform_name=waveform_name,
                 sar_mode=sar_mode,
+                gate_delay=self.gate_delay,
             )
 
         write_hdf5(
@@ -149,6 +155,10 @@ class SimulationEngine:
     platform : Platform | None
         Platform configuration for trajectory and sensor generation.
         When provided, overrides platform_velocity and platform_start.
+    swath_range : tuple[float, float] | None
+        Range gate as (near_range_m, far_range_m). Limits the receive
+        window to echoes from this slant-range interval. If None,
+        auto-computed from scene targets with 20% margin.
     """
 
     def __init__(
@@ -164,6 +174,7 @@ class SimulationEngine:
         n_subswaths: int = 3,
         burst_length: int = 20,
         platform: Platform | None = None,
+        swath_range: tuple[float, float] | None = None,
     ) -> None:
         if n_pulses <= 0:
             raise ValueError(f"n_pulses must be positive, got {n_pulses}")
@@ -174,9 +185,10 @@ class SimulationEngine:
         self.seed = seed
         self._platform = platform
 
-        # Default sample rate: 2x bandwidth (Nyquist)
+        # Default sample rate: 3x bandwidth (oversampled for anti-aliasing
+        # margin, RCMC interpolation accuracy, and sidelobe control)
         self.sample_rate = (
-            sample_rate if sample_rate is not None else 2.0 * radar.bandwidth
+            sample_rate if sample_rate is not None else 3.0 * radar.bandwidth
         )
 
         # Platform motion defaults (used when no Platform object provided)
@@ -197,6 +209,67 @@ class SimulationEngine:
         )
         self._n_subswaths = n_subswaths
         self._burst_length = burst_length
+        self._swath_range = swath_range
+
+    @staticmethod
+    def format_memory_size(size_bytes: int | float) -> str:
+        """Format a byte count as a human-readable string.
+
+        Parameters
+        ----------
+        size_bytes : int | float
+            Size in bytes.
+
+        Returns
+        -------
+        str
+            Human-readable size string (e.g. "1.50 GB").
+        """
+        if size_bytes >= 1024**3:
+            return f"{size_bytes / 1024**3:.2f} GB"
+        elif size_bytes >= 1024**2:
+            return f"{size_bytes / 1024**2:.2f} MB"
+        elif size_bytes >= 1024:
+            return f"{size_bytes / 1024:.2f} KB"
+        else:
+            return f"{size_bytes} bytes"
+
+    def estimate_memory(self) -> int:
+        """Estimate total memory usage for the simulation.
+
+        Accounts for echo data (complex128 = 16 bytes per sample) across
+        all polarization channels, plus working memory for FFT buffers
+        (approximately 2x echo size).
+
+        Returns
+        -------
+        int
+            Estimated memory usage in bytes.
+
+        Warns
+        -----
+        ResourceWarning
+            If estimated memory exceeds 1 GB.
+        """
+        n_range = self._compute_n_range_samples()
+        n_channels = len(self._get_channels())
+        bytes_per_sample = 16  # complex128
+
+        echo_bytes = self.n_pulses * n_range * n_channels * bytes_per_sample
+        # Working memory: ~2x echo for FFT buffers and intermediate arrays
+        total_bytes = echo_bytes * 3  # echo + 2x working
+
+        one_gb = 1024**3
+        if total_bytes > one_gb:
+            warnings.warn(
+                f"Estimated memory usage is {self.format_memory_size(total_bytes)} "
+                f"({self.n_pulses} pulses x {n_range} range samples x "
+                f"{n_channels} channels). Consider reducing simulation size.",
+                ResourceWarning,
+                stacklevel=2,
+            )
+
+        return total_bytes
 
     def _get_channels(self) -> list[str]:
         """Get polarization channels to simulate."""
@@ -267,17 +340,80 @@ class SimulationEngine:
 
         return np.zeros((target.ny, target.nx))
 
-    def _compute_n_range_samples(self) -> int:
-        """Compute number of range samples per pulse.
+    def _compute_range_gate(self) -> tuple[float, int]:
+        """Compute range gate delay and number of range samples.
 
-        Uses the PRI duration to determine the receive window length.
+        Returns
+        -------
+        gate_delay : float
+            Round-trip delay to the near edge of the swath in seconds.
+        n_samples : int
+            Number of range samples in the receive window.
         """
-        pri = self.radar.pri
         wf_duration = self.radar.waveform.duration(self.radar.prf)
-        # Receive window = PRI - transmit duration (for pulsed)
-        # For FMCW, use full PRI
-        receive_window = pri - wf_duration if wf_duration < pri else pri
-        return int(receive_window * self.sample_rate)
+
+        if self._swath_range is not None:
+            near_range, far_range = self._swath_range
+        else:
+            # Auto-compute from scene targets
+            near_range, far_range = self._auto_swath_range()
+
+        gate_delay = 2.0 * near_range / C_LIGHT
+        far_delay = 2.0 * far_range / C_LIGHT + wf_duration
+        receive_window = far_delay - gate_delay
+
+        # Clamp to PRI
+        pri = self.radar.pri
+        max_window = pri - wf_duration if wf_duration < pri else pri
+        if receive_window > max_window:
+            receive_window = max_window
+
+        return gate_delay, int(receive_window * self.sample_rate)
+
+    def _auto_swath_range(self) -> tuple[float, float]:
+        """Auto-compute swath range from scene targets with 20% margin."""
+        ranges = []
+
+        # Use platform start position for range estimation
+        if self._platform is not None:
+            ref_pos = np.array([0.0, 0.0, self._platform.altitude])
+            if self._platform.start_position is not None:
+                ref_pos = self._platform.start_position
+        else:
+            ref_pos = self._start_pos
+
+        for pt in self.scene.point_targets:
+            ranges.append(float(np.linalg.norm(pt.position - ref_pos)))
+
+        for dt in self.scene.distributed_targets:
+            # Use corners of the distributed target
+            corners = [
+                dt.origin,
+                dt.origin + np.array([dt.extent[0], 0, 0]),
+                dt.origin + np.array([0, dt.extent[1], 0]),
+                dt.origin + np.array([dt.extent[0], dt.extent[1], 0]),
+            ]
+            for c in corners:
+                ranges.append(float(np.linalg.norm(c - ref_pos)))
+
+        if not ranges:
+            # No targets — fall back to full PRI
+            pri = self.radar.pri
+            wf_dur = self.radar.waveform.duration(self.radar.prf)
+            max_range = C_LIGHT * (pri - wf_dur) / 2.0 if wf_dur < pri else C_LIGHT * pri / 2.0
+            return 0.0, max_range
+
+        r_min = min(ranges)
+        r_max = max(ranges)
+        extent = r_max - r_min
+        margin = max(extent * 0.2, 100.0)  # at least 100 m margin
+
+        return max(0.0, r_min - margin), r_max + margin
+
+    def _compute_n_range_samples(self) -> int:
+        """Compute number of range samples per pulse (backward compat)."""
+        _, n = self._compute_range_gate()
+        return n
 
     def _generate_receiver_noise(
         self, n_samples: int, rng: np.random.Generator
@@ -340,7 +476,7 @@ class SimulationEngine:
         """
         rng = np.random.default_rng(self.seed)
         channels = self._get_channels()
-        n_range = self._compute_n_range_samples()
+        gate_delay, n_range = self._compute_range_gate()
         pri = self.radar.pri
 
         # Generate trajectories if Platform is provided
@@ -422,6 +558,7 @@ class SimulationEngine:
                         target_velocity=target.velocity,
                         tx_signal=tx_signal,
                         phase_noise=pulse_phase_noise,
+                        gate_delay=gate_delay,
                     )
 
                 # Distributed targets
@@ -443,6 +580,7 @@ class SimulationEngine:
                         two_way_gain_func=_gain_func,
                         tx_signal=tx_signal,
                         phase_noise=pulse_phase_noise,
+                        gate_delay=gate_delay,
                     )
 
                 # Add receiver noise
@@ -459,6 +597,7 @@ class SimulationEngine:
             ideal_trajectory=ideal_traj,
             true_trajectory=true_traj,
             navigation_data=nav_data,
+            gate_delay=gate_delay,
         )
 
 

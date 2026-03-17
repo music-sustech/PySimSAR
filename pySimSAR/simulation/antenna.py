@@ -47,8 +47,9 @@ def compute_look_angles(
         in radians.  Positive toward the look side (right for RIGHT look,
         left for LEFT look).
     elevation : float
-        Depression angle below the horizontal plane, in radians.
-        Positive values indicate the target is below the platform.
+        Elevation angle in radians.  Negative values indicate the target
+        is below the platform (consistent with beam steering convention
+        where negative = downward-looking).
     """
     platform_pos = np.asarray(platform_pos, dtype=float)
     target_pos = np.asarray(target_pos, dtype=float)
@@ -97,10 +98,11 @@ def compute_look_angles(
     # is zero when the target is exactly perpendicular to the flight track.
     azimuth = math.atan2(los_along, los_cross)
 
-    # Elevation (depression): angle below the horizontal plane.
-    # los_cross is the horizontal range in the cross-track plane.
+    # Elevation: angle from the horizontal plane.
+    # Negative = target is below the platform (downward-looking).
+    # This matches the beam steering convention (negative = downward).
     slant_horiz = math.sqrt(los_along**2 + los_cross**2)
-    elevation = math.atan2(-los_up, slant_horiz)  # positive = target below
+    elevation = math.atan2(los_up, slant_horiz)  # negative = target below
 
     return azimuth, elevation
 
@@ -157,12 +159,11 @@ def _spotlight_beam(
     el_steer : float
         Elevation steering angle in radians.
     """
-    az_steer, el_raw = compute_look_angles(
+    az_steer, el_steer = compute_look_angles(
         radar, platform_pos, scene_center, platform_vel
     )
-    # el_raw from compute_look_angles is depression (positive = below).
-    # The beam steering convention here uses negative for downward.
-    el_steer = -el_raw
+    # compute_look_angles now returns beam convention (negative = downward),
+    # matching the steering convention directly.
     return az_steer, el_steer
 
 

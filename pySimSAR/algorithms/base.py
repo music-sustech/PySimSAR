@@ -19,6 +19,11 @@ class ImageFormationAlgorithm(ABC):
 
     name: str = ""
 
+    @classmethod
+    def parameter_schema(cls) -> dict:
+        """Declare expected parameters, types, defaults, and descriptions."""
+        return {}
+
     @abstractmethod
     def process(self, raw_data: object, radar: object, trajectory: object) -> object:
         """Run the complete image formation pipeline.
@@ -100,6 +105,11 @@ class MotionCompensationAlgorithm(ABC):
 
     name: str = ""
 
+    @classmethod
+    def parameter_schema(cls) -> dict:
+        """Declare expected parameters, types, defaults, and descriptions."""
+        return {}
+
     @property
     @abstractmethod
     def order(self) -> int:
@@ -138,6 +148,11 @@ class AutofocusAlgorithm(ABC):
     name: str = ""
     max_iterations: int = 10
     convergence_threshold: float = 0.01  # radians
+
+    @classmethod
+    def parameter_schema(cls) -> dict:
+        """Declare expected parameters, types, defaults, and descriptions."""
+        return {}
 
     @abstractmethod
     def focus(self, phase_history: object, azimuth_compressor: object) -> object:
@@ -183,6 +198,11 @@ class ImageTransformationAlgorithm(ABC):
 
     name: str = ""
 
+    @classmethod
+    def parameter_schema(cls) -> dict:
+        """Declare expected parameters, types, defaults, and descriptions."""
+        return {}
+
     @property
     @abstractmethod
     def output_geometry(self) -> ImageGeometry:
@@ -215,6 +235,11 @@ class PolarimetricDecomposition(ABC):
     """
 
     name: str = ""
+
+    @classmethod
+    def parameter_schema(cls) -> dict:
+        """Declare expected parameters, types, defaults, and descriptions."""
+        return {}
 
     @property
     @abstractmethod

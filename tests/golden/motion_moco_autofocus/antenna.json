@@ -1,0 +1,7 @@
+{
+  "type": "preset",
+  "preset": "gaussian",
+  "az_beamwidth_deg": 3.0,
+  "el_beamwidth_deg": 10.0,
+  "peak_gain_dB": 30.0
+}

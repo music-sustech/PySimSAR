@@ -234,56 +234,56 @@
 
 ## Phase 8.5: Parameter Sets, Model Enhancements, and Golden Tests
 
-**Purpose**: Add parameter set I/O, receiver gain model, RCS model interface, antenna presets, reusable component presets, binary data visualization tool, and three golden reference test cases. See design spec: `docs/superpowers/specs/2026-03-16-parameter-sets-and-golden-tests-design.md`.
+**Purpose**: Add parameter set I/O, receiver gain model, RCS model interface, antenna presets, reusable component presets, binary data visualization tool, and three golden reference test cases.
 
 **Dependencies**: Depends on Phase 8 (needs all simulation + processing infrastructure in place). Must be complete before Phase 9 (golden tests validate end-to-end pipeline including image formation).
 
 ### Model Enhancements
 
-- [ ] T096a Unit test for Radar with receiver_gain_dB (cascade noise figure, updated noise_power) in `tests/unit/test_radar.py`
-- [ ] T096b Unit test for RCSModel ABC and StaticRCS in `tests/unit/test_rcs_model.py`
-- [ ] T096c Unit test for PointTarget with rcs_model parameter in `tests/unit/test_scene.py`
-- [ ] T096d Implement RCSModel ABC and StaticRCS in `pySimSAR/core/rcs_model.py`
-- [ ] T096e Add receiver_gain_dB to Radar (constructor, total_noise_figure property, updated noise_power) in `pySimSAR/core/radar.py`
-- [ ] T096f Update compute_path_loss and compute_target_echo to propagate receiver_gain_dB in `pySimSAR/simulation/signal.py`
-- [ ] T096g Update SimulationEngine to pass radar.receiver_gain through signal computation in `pySimSAR/simulation/engine.py`
-- [ ] T096h Add rcs_model parameter to PointTarget (defaults to StaticRCS) in `pySimSAR/core/scene.py`
-- [ ] T096i Extend ProcessingConfig with per-algorithm *_params dicts in `pySimSAR/io/config.py`
+- [x] T096a Unit test for Radar with receiver_gain_dB (cascade noise figure, updated noise_power) in `tests/unit/test_radar.py`
+- [x] T096b Unit test for RCSModel ABC and StaticRCS in `tests/unit/test_rcs_model.py`
+- [x] T096c Unit test for PointTarget with rcs_model parameter in `tests/unit/test_scene.py`
+- [x] T096d Implement RCSModel ABC and StaticRCS in `pySimSAR/core/rcs_model.py`
+- [x] T096e Add receiver_gain_dB to Radar (constructor, total_noise_figure property, updated noise_power) in `pySimSAR/core/radar.py`
+- [x] T096f Update compute_path_loss and compute_target_echo to propagate receiver_gain_dB in `pySimSAR/simulation/signal.py`
+- [x] T096g Update SimulationEngine to pass radar.receiver_gain through signal computation in `pySimSAR/simulation/engine.py`
+- [x] T096h Add rcs_model parameter to PointTarget (defaults to StaticRCS) in `pySimSAR/core/scene.py`
+- [x] T096i Extend ProcessingConfig with per-algorithm *_params dicts in `pySimSAR/io/config.py`
 
 ### Antenna Presets
 
-- [ ] T096j Unit test for antenna preset factory (flat, sinc, gaussian patterns, 3 dB beamwidth verification) in `tests/unit/test_radar.py`
-- [ ] T096k Implement create_antenna_from_preset() factory function (flat with -60 dB floor, sinc with 0.886 factor and -60 dB floor, gaussian with K=12) in `pySimSAR/core/radar.py`
+- [x] T096j Unit test for antenna preset factory (flat, sinc, gaussian patterns, 3 dB beamwidth verification) in `tests/unit/test_radar.py`
+- [x] T096k Implement create_antenna_from_preset() factory function (flat with -60 dB floor, sinc with 0.886 factor and -60 dB floor, gaussian with K=12) in `pySimSAR/core/radar.py`
 
 ### Parameter Set I/O
 
-- [ ] T096l [P] Unit test for resolve_refs ($ref JSON loading, $data .npy/.npz/.csv loading, circular ref detection, sibling key error) in `tests/unit/test_parameter_set.py`
-- [ ] T096m [P] Unit test for load_parameter_set (unit suffix stripping, degree-to-radian conversion, geographic coord exemption, format_version check) in `tests/unit/test_parameter_set.py`
-- [ ] T096n [P] Unit test for build_simulation (object construction from resolved params, window name-to-callable factory, algorithm registry lookup, user module dynamic import) in `tests/unit/test_parameter_set.py`
-- [ ] T096o [P] Unit test for save_parameter_set (round-trip: save then load, inline vs bulk point target threshold, $ref structure) in `tests/unit/test_parameter_set.py`
-- [ ] T096p Implement resolve_refs (recursive $ref and $data resolution with visited-path cycle detection) in `pySimSAR/io/parameter_set.py`
-- [ ] T096q Implement load_parameter_set (load project.json, resolve refs, strip unit suffixes, convert degrees, validate structure) in `pySimSAR/io/parameter_set.py`
-- [ ] T096r Implement build_simulation (construct Scene, Radar, Platform, engine kwargs, ProcessingConfig from resolved dict; window factory; antenna preset factory; algorithm param schema validation) in `pySimSAR/io/parameter_set.py`
-- [ ] T096s Implement save_parameter_set (serialize objects to project directory with $ref links, .npy for large arrays, inline for small targets <= 20) in `pySimSAR/io/parameter_set.py`
+- [x] T096l [P] Unit test for resolve_refs ($ref JSON loading, $data .npy/.npz/.csv loading, circular ref detection, sibling key error) in `tests/unit/test_parameter_set.py`
+- [x] T096m [P] Unit test for load_parameter_set (unit suffix stripping, degree-to-radian conversion, geographic coord exemption, format_version check) in `tests/unit/test_parameter_set.py`
+- [x] T096n [P] Unit test for build_simulation (object construction from resolved params, window name-to-callable factory, algorithm registry lookup, user module dynamic import) in `tests/unit/test_parameter_set.py`
+- [x] T096o [P] Unit test for save_parameter_set (round-trip: save then load, inline vs bulk point target threshold, $ref structure) in `tests/unit/test_parameter_set.py`
+- [x] T096p Implement resolve_refs (recursive $ref and $data resolution with visited-path cycle detection) in `pySimSAR/io/parameter_set.py`
+- [x] T096q Implement load_parameter_set (load project.json, resolve refs, strip unit suffixes, convert degrees, validate structure) in `pySimSAR/io/parameter_set.py`
+- [x] T096r Implement build_simulation (construct Scene, Radar, Platform, engine kwargs, ProcessingConfig from resolved dict; window factory; antenna preset factory; algorithm param schema validation) in `pySimSAR/io/parameter_set.py`
+- [x] T096s Implement save_parameter_set (serialize objects to project directory with $ref links, .npy for large arrays, inline for small targets <= 20) in `pySimSAR/io/parameter_set.py`
 
 ### Reusable Presets
 
-- [ ] T096t [P] Create shipped antenna presets (flat_default.json, sinc_xband.json, gaussian_default.json) in `pySimSAR/presets/antennas/`
-- [ ] T096u [P] Create shipped waveform presets (lfm_xband_150mhz.json, lfm_cband_50mhz.json, fmcw_wband_1ghz.json) in `pySimSAR/presets/waveforms/`
-- [ ] T096v [P] Create shipped sensor presets (tactical_gps.json, rtk_gps.json, mems_imu.json, navigation_imu.json) in `pySimSAR/presets/sensors/`
-- [ ] T096w [P] Create shipped platform presets (airborne_100mps.json, uav_30mps.json) in `pySimSAR/presets/platforms/`
+- [x] T096t [P] Create shipped antenna presets (flat_default.json, sinc_xband.json, gaussian_default.json) in `pySimSAR/presets/antennas/`
+- [x] T096u [P] Create shipped waveform presets (lfm_xband_150mhz.json, lfm_cband_50mhz.json, fmcw_wband_1ghz.json) in `pySimSAR/presets/waveforms/`
+- [x] T096v [P] Create shipped sensor presets (tactical_gps.json, rtk_gps.json, mems_imu.json, navigation_imu.json) in `pySimSAR/presets/sensors/`
+- [x] T096w [P] Create shipped platform presets (airborne_100mps.json, uav_30mps.json) in `pySimSAR/presets/platforms/`
 
 ### Binary Data Visualization Tool
 
-- [ ] T096x Unit test for view_array CLI tool (1D line plot, 2D real imshow, 2D complex mag+phase, .npz key selection, positions scatter) in `tests/unit/test_view_array.py`
-- [ ] T096y Implement view_array CLI tool (argparse, shape-based display, --key, --slice, --cmap, --save options) in `pySimSAR/tools/view_array.py`
+- [x] T096x Unit test for view_array CLI tool (1D line plot, 2D real imshow, 2D complex mag+phase, .npz key selection, positions scatter) in `tests/unit/test_view_array.py`
+- [x] T096y Implement view_array CLI tool (argparse, shape-based display, --key, --slice, --cmap, --save options) in `pySimSAR/tools/view_array.py`
 
 ### Golden Reference Test Cases
 
-- [ ] T096z1 Create golden test case 1: single_point_stripmap (project.json, scene, radar, waveform, antenna, platform JSONs, README.md with analytical calculations) in `tests/golden/single_point_stripmap/`
-- [ ] T096z2 Create golden test case 2: multi_target_spotlight (3 targets, Omega-K, Hamming window, sinc antenna, README.md with analytical calculations) in `tests/golden/multi_target_spotlight/`
-- [ ] T096z3 Create golden test case 3: motion_moco_autofocus (Dryden turbulence, first-order MoCo, PGA, README.md with analytical calculations) in `tests/golden/motion_moco_autofocus/`
-- [ ] T096z4 Implement golden test runner (load parameter set, build simulation, run, image formation, validate against analytical expectations) in `tests/integration/test_golden.py`
+- [x] T096z1 Create golden test case 1: single_point_stripmap (project.json, scene, radar, waveform, antenna, platform JSONs, README.md with analytical calculations) in `tests/golden/single_point_stripmap/`
+- [x] T096z2 Create golden test case 2: multi_target_spotlight (3 targets, Omega-K, Hamming window, sinc antenna, README.md with analytical calculations) in `tests/golden/multi_target_spotlight/`
+- [x] T096z3 Create golden test case 3: motion_moco_autofocus (Dryden turbulence, first-order MoCo, PGA, README.md with analytical calculations) in `tests/golden/motion_moco_autofocus/`
+- [x] T096z4 Implement golden test runner (load parameter set, build simulation, run, image formation, validate against analytical expectations) in `tests/integration/test_golden.py`
 
 **Checkpoint**: Parameter sets save/load round-trip correctly. Receiver gain cascade noise model verified. Antenna presets produce correct beam patterns. All 3 golden test cases pass end-to-end with analytical validation. view_array tool displays arrays correctly.
 
@@ -343,13 +343,13 @@
 
 ### Tests for User Story 8
 
-- [ ] T111 [US8] Integration test for PipelineRunner (full chain, config-driven) in `tests/integration/test_simulation_pipeline.py`
-- [ ] T112 [US8] Integration test for re-processing (same raw data, different ProcessingConfig) in `tests/integration/test_simulation_pipeline.py`
+- [x] T111 [US8] Integration test for PipelineRunner (full chain, config-driven) in `tests/integration/test_simulation_pipeline.py`
+- [x] T112 [US8] Integration test for re-processing (same raw data, different ProcessingConfig) in `tests/integration/test_simulation_pipeline.py`
 
 ### Implementation for User Story 8
 
-- [ ] T113 [US8] Implement PipelineRunner (sequential execution per ProcessingConfig, optional step skipping) in `pySimSAR/pipeline/runner.py`
-- [ ] T114 [US8] Implement data import (load external HDF5 as RawData + NavigationData for processing-only workflow) in `pySimSAR/io/hdf5_format.py`
+- [x] T113 [US8] Implement PipelineRunner (sequential execution per ProcessingConfig, optional step skipping) in `pySimSAR/pipeline/runner.py`
+- [x] T114 [US8] Implement data import (load external HDF5 as RawData + NavigationData for processing-only workflow) in `pySimSAR/io/hdf5_format.py`
 
 **Checkpoint**: Full pipeline runs end-to-end via config. Re-processing works without re-simulation. Data import works.
 
@@ -363,20 +363,20 @@
 
 ### Tests for User Story 9
 
-- [ ] T115 [US9] GUI smoke test (launch, configure, run basic simulation) in `tests/gui/test_app.py`
+- [x] T115 [US9] GUI smoke test (launch, configure, run basic simulation) in `tests/gui/test_app.py`
 
 ### Implementation for User Story 9
 
-- [ ] T116 [US9] Implement main application window (menu, toolbar, panel layout) in `pySimSAR/gui/app.py`
-- [ ] T117 [P] [US9] Implement parameter editor widgets (radar, waveform, platform, scene config forms with validation) in `pySimSAR/gui/widgets/param_editor.py`
-- [ ] T118 [P] [US9] Implement algorithm selector widget (dropdowns for MoCo, image formation, autofocus, geocoding, polsar from registries) in `pySimSAR/gui/widgets/algorithm_selector.py`
-- [ ] T119 [P] [US9] Implement 3D scene viewer panel (point targets as scatter, distributed targets as mesh, pyqtgraph GLViewWidget) in `pySimSAR/gui/panels/scene_3d.py`
-- [ ] T120 [P] [US9] Implement trajectory viewer panel (ideal + perturbed paths in 3D, rotate/zoom) in `pySimSAR/gui/panels/trajectory.py`
-- [ ] T121 [P] [US9] Implement beam animation panel (radar footprint sweep along trajectory, playback controls) in `pySimSAR/gui/panels/beam_animation.py`
-- [ ] T122 [P] [US9] Implement SAR image viewer panel (matplotlib display, colormap, dynamic range, zoom) in `pySimSAR/gui/panels/image_viewer.py`
-- [ ] T123 [US9] Implement simulation controller (run simulation in background thread, progress reporting, cancellation) in `pySimSAR/gui/controllers/simulation_ctrl.py`
-- [ ] T124 [US9] Implement project model (create new simulation project, import existing HDF5, save/load project state) in `pySimSAR/gui/controllers/simulation_ctrl.py`
-- [ ] T125 [US9] Wire all panels and controllers to main window (signal/slot connections, data flow) in `pySimSAR/gui/app.py`
+- [x] T116 [US9] Implement main application window (menu, toolbar, panel layout) in `pySimSAR/gui/app.py`
+- [x] T117 [P] [US9] Implement parameter editor widgets (radar, waveform, platform, scene config forms with validation) in `pySimSAR/gui/widgets/param_editor.py`
+- [x] T118 [P] [US9] Implement algorithm selector widget (dropdowns for MoCo, image formation, autofocus, geocoding, polsar from registries) in `pySimSAR/gui/widgets/algorithm_selector.py`
+- [x] T119 [P] [US9] Implement 3D scene viewer panel (point targets as scatter, distributed targets as mesh, pyqtgraph GLViewWidget) in `pySimSAR/gui/panels/scene_3d.py`
+- [x] T120 [P] [US9] Implement trajectory viewer panel (ideal + perturbed paths in 3D, rotate/zoom) in `pySimSAR/gui/panels/trajectory.py`
+- [x] T121 [P] [US9] Implement beam animation panel (radar footprint sweep along trajectory, playback controls) in `pySimSAR/gui/panels/beam_animation.py`
+- [x] T122 [P] [US9] Implement SAR image viewer panel (matplotlib display, colormap, dynamic range, zoom) in `pySimSAR/gui/panels/image_viewer.py`
+- [x] T123 [US9] Implement simulation controller (run simulation in background thread, progress reporting, cancellation) in `pySimSAR/gui/controllers/simulation_ctrl.py`
+- [x] T124 [US9] Implement project model (create new simulation project, import existing HDF5, save/load project state) in `pySimSAR/gui/controllers/simulation_ctrl.py`
+- [x] T125 [US9] Wire all panels and controllers to main window (signal/slot connections, data flow) in `pySimSAR/gui/app.py`
 
 **Checkpoint**: GUI launches, parameters configurable, simulation runs with progress, all 4 visualization panels display correct data. Projects can be created from simulation or data import.
 
@@ -386,14 +386,14 @@
 
 **Purpose**: Improvements that affect multiple user stories.
 
-- [ ] T126 [P] Run full validation of quickstart.md examples end-to-end
-- [ ] T127 [P] Performance profiling of simulation engine for 1024×1024 scene (SC-006: < 60s target)
-- [ ] T128 [P] Memory estimation and warning for large simulations (edge case from spec)
-- [ ] T129 Code cleanup, docstrings for all public APIs
-- [ ] T130 SAR mode validation (stripmap/spotlight/scanmar compatibility checks across waveform + algorithm)
-- [ ] T131 [P] Polarimetric input validation (quad-pol channel checks before decomposition)
-- [ ] T132 Validate API parity: verify every GUI action (configure, run, visualize, import) has a corresponding Python API call (FR-013)
-- [ ] T133 Final integration test: full pipeline from scene definition through GUI to geocoded polarimetric image
+- [x] T126 [P] Run full validation of quickstart.md examples end-to-end
+- [x] T127 [P] Performance profiling of simulation engine for 1024×1024 scene (SC-006: < 60s target)
+- [x] T128 [P] Memory estimation and warning for large simulations (edge case from spec)
+- [x] T129 Code cleanup, docstrings for all public APIs
+- [x] T130 SAR mode validation (stripmap/spotlight/scanmar compatibility checks across waveform + algorithm)
+- [x] T131 [P] Polarimetric input validation (quad-pol channel checks before decomposition)
+- [x] T132 Validate API parity: verify every GUI action (configure, run, visualize, import) has a corresponding Python API call (FR-013)
+- [x] T133 Final integration test: full pipeline from scene definition through GUI to geocoded polarimetric image
 
 ---
 

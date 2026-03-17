@@ -104,6 +104,7 @@ class RawData:
     prf: float
     waveform_name: str = ""
     sar_mode: str = "stripmap"
+    gate_delay: float = 0.0
 
     def __post_init__(self) -> None:
         self.echo = np.asarray(self.echo)
@@ -163,6 +164,7 @@ class PhaseHistoryData:
     carrier_freq: float
     bandwidth: float
     channel: str = "single"
+    gate_delay: float = 0.0
 
     def __post_init__(self) -> None:
         self.data = np.asarray(self.data)

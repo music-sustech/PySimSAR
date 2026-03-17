@@ -47,4 +47,7 @@ known-first-party = ["pySimSAR"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -m 'not slow'"
+markers = [
+    "slow: marks tests as slow (deselected by default, run with '-m slow')",
+]

@@ -167,6 +167,7 @@ class Radar:
         system_losses: float = 2.0,
         reference_temp: float = 290.0,
         squint_angle: float = 0.0,
+        receiver_gain_dB: float = 0.0,
     ) -> None:
         # Validate scalars
         if carrier_freq <= 0:
@@ -181,6 +182,8 @@ class Radar:
             raise ValueError(f"system_losses must be >= 0, got {system_losses}")
         if reference_temp <= 0:
             raise ValueError(f"reference_temp must be positive, got {reference_temp}")
+        if receiver_gain_dB < 0:
+            raise ValueError(f"receiver_gain_dB must be >= 0, got {receiver_gain_dB}")
         if not 0 <= depression_angle <= math.pi / 2:
             raise ValueError(
                 f"depression_angle must be in [0, pi/2], got {depression_angle}"
@@ -202,6 +205,7 @@ class Radar:
         self.noise_figure = noise_figure
         self.system_losses = system_losses
         self.reference_temp = reference_temp
+        self.receiver_gain = receiver_gain_dB
         self.waveform = waveform
         self.antenna = antenna
         self.depression_angle = depression_angle
@@ -236,10 +240,94 @@ class Radar:
         return C_LIGHT / self.carrier_freq
 
     @property
+    def total_noise_figure(self) -> float:
+        """Total system noise figure in dB (cascade: passive loss + receiver)."""
+        l_sys = 10.0 ** (self.system_losses / 10.0)
+        f_rx = 10.0 ** (self.noise_figure / 10.0)
+        f_total = l_sys * f_rx
+        return 10.0 * np.log10(f_total)
+
+    @property
     def noise_power(self) -> float:
-        """Thermal noise power in Watts (k * T * B * F)."""
-        f_linear = 10.0 ** (self.noise_figure / 10.0)
-        return K_BOLTZMANN * self.reference_temp * self.bandwidth * f_linear
+        """Thermal noise power at receiver output in Watts."""
+        f_total_linear = 10.0 ** (self.total_noise_figure / 10.0)
+        g_rx_linear = 10.0 ** (self.receiver_gain / 10.0)
+        return K_BOLTZMANN * self.reference_temp * self.bandwidth * f_total_linear * g_rx_linear
 
 
-__all__ = ["AntennaPattern", "Radar", "C_LIGHT", "K_BOLTZMANN"]
+def create_antenna_from_preset(
+    preset: str,
+    az_beamwidth: float,
+    el_beamwidth: float,
+    peak_gain_dB: float,
+) -> AntennaPattern:
+    """Create an AntennaPattern from a named preset.
+
+    Parameters
+    ----------
+    preset : str
+        Preset name: "flat", "sinc", or "gaussian".
+    az_beamwidth : float
+        3 dB azimuth beamwidth in radians.
+    el_beamwidth : float
+        3 dB elevation beamwidth in radians.
+    peak_gain_dB : float
+        Peak antenna gain in dB.
+
+    Returns
+    -------
+    AntennaPattern
+        Configured antenna pattern.
+    """
+    preset = preset.lower()
+    floor_dB = -60.0
+
+    if preset == "flat":
+        half_az = az_beamwidth / 2.0
+        half_el = el_beamwidth / 2.0
+
+        def flat_pattern(az: float, el: float) -> float:
+            if abs(az) < half_az and abs(el) < half_el:
+                return peak_gain_dB
+            return peak_gain_dB + floor_dB
+
+        return AntennaPattern(
+            pattern_2d=flat_pattern,
+            az_beamwidth=az_beamwidth,
+            el_beamwidth=el_beamwidth,
+            peak_gain_dB=peak_gain_dB,
+        )
+
+    elif preset == "sinc":
+        def sinc_pattern(az: float, el: float) -> float:
+            az_arg = 0.886 * az / az_beamwidth
+            el_arg = 0.886 * el / el_beamwidth
+            gain_az = np.sinc(az_arg)  # np.sinc includes the pi factor
+            gain_el = np.sinc(el_arg)
+            gain_dB = 20.0 * np.log10(max(abs(gain_az * gain_el), 1e-30))
+            return peak_gain_dB + max(floor_dB, gain_dB)
+
+        return AntennaPattern(
+            pattern_2d=sinc_pattern,
+            az_beamwidth=az_beamwidth,
+            el_beamwidth=el_beamwidth,
+            peak_gain_dB=peak_gain_dB,
+        )
+
+    elif preset == "gaussian":
+        def gaussian_pattern(az: float, el: float) -> float:
+            loss = 12.0 * ((az / az_beamwidth) ** 2 + (el / el_beamwidth) ** 2)
+            return peak_gain_dB - loss
+
+        return AntennaPattern(
+            pattern_2d=gaussian_pattern,
+            az_beamwidth=az_beamwidth,
+            el_beamwidth=el_beamwidth,
+            peak_gain_dB=peak_gain_dB,
+        )
+
+    else:
+        raise ValueError(f"Unknown antenna preset: {preset!r}. Use 'flat', 'sinc', or 'gaussian'.")
+
+
+__all__ = ["AntennaPattern", "Radar", "C_LIGHT", "K_BOLTZMANN", "create_antenna_from_preset"]

@@ -106,7 +106,7 @@ pySimSAR/                    # Main Python package
 │   ├── imu.py               # IMUSensor config + IMUErrorModel ABC
 │   ├── imu_white_noise.py   # Default: white noise model
 │   ├── registry.py          # Sensor error model registration
-│   └── nav_filter.py        # Navigation data fusion (optional)
+│   └── nav_filter.py        # Navigation data fusion (future)
 │
 ├── motion/                  # Motion perturbation models
 │   ├── __init__.py

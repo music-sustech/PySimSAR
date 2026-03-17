@@ -1,0 +1,8 @@
+{
+  "velocity_mps": 100.0,
+  "altitude_m": 2000.0,
+  "heading_deg": 0.0,
+  "start_position_m": null,
+  "perturbation": null,
+  "sensors": null
+}

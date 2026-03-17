@@ -1,0 +1,16 @@
+{
+  "carrier_freq_hz": 9.65e9,
+  "prf_hz": 1000.0,
+  "transmit_power_w": 1000.0,
+  "receiver_gain_dB": 0.0,
+  "noise_figure_dB": 3.0,
+  "system_losses_dB": 2.0,
+  "reference_temp_K": 290.0,
+  "polarization": "single",
+  "mode": "stripmap",
+  "look_side": "right",
+  "depression_angle_deg": 45.0,
+  "squint_angle_deg": 0.0,
+  "waveform": { "$ref": "waveform.json" },
+  "antenna": { "$ref": "antenna.json" }
+}

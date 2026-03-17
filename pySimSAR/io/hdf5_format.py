@@ -312,4 +312,54 @@ def _read_image(grp: h5py.Group) -> SARImage:
     )
 
 
-__all__ = ["write_hdf5", "read_hdf5"]
+def import_data(filepath: str | Path) -> dict:
+    """Import external HDF5 as RawData + NavigationData for processing-only workflow.
+
+    This is a convenience wrapper around ``read_hdf5`` that validates
+    the imported file contains at least raw data, and returns a dict
+    ready for use with PipelineRunner.
+
+    Parameters
+    ----------
+    filepath : str | Path
+        Path to an HDF5 file containing raw SAR data.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys:
+        - "raw_data": dict[str, RawData]
+        - "trajectory": Trajectory | None
+        - "navigation_data": list[NavigationData]
+        - "radar_params": dict (carrier_freq, bandwidth, prf, etc.)
+
+    Raises
+    ------
+    ValueError
+        If the file contains no raw data.
+    """
+    data = read_hdf5(filepath)
+
+    if not data["raw_data"]:
+        raise ValueError(f"No raw data found in {filepath}")
+
+    # Extract radar parameters from the first channel for convenience
+    first_rd = next(iter(data["raw_data"].values()))
+    radar_params = {
+        "carrier_freq": first_rd.carrier_freq,
+        "bandwidth": first_rd.bandwidth,
+        "prf": first_rd.prf,
+        "sample_rate": first_rd.sample_rate,
+        "waveform_name": first_rd.waveform_name,
+        "sar_mode": first_rd.sar_mode,
+    }
+
+    return {
+        "raw_data": data["raw_data"],
+        "trajectory": data["trajectory"],
+        "navigation_data": data["navigation_data"],
+        "radar_params": radar_params,
+    }
+
+
+__all__ = ["write_hdf5", "read_hdf5", "import_data"]

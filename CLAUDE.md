@@ -54,3 +54,15 @@ Features are developed through the Speckit pipeline:
 - PowerShell (cross-platform `pwsh`)
 - Git
 - Claude Code
+
+## Environment
+- OS: Windows 11
+- Shell: PowerShell 5.1 / pwsh
+- Python: 3.14 at C:\Users\Xiaoguang\AppData\Local\Programs\Python\Python314\python.exe
+
+## Shell conventions
+- Use PowerShell syntax, not bash (no `&&`, use `;` or separate commands)
+- Path separator is `\`
+- Use `python` not `python3`
+- To chain commands: `cd "path"; python -m pytest` or use `-Command` blocks
+- Prefer `$env:VAR` over `export VAR=`

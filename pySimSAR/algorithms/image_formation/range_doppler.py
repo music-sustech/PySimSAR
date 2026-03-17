@@ -85,6 +85,7 @@ class RangeDopplerAlgorithm(ImageFormationAlgorithm):
             carrier_freq=radar.carrier_freq,
             bandwidth=radar.bandwidth,
             channel=raw_data.channel,
+            gate_delay=raw_data.gate_delay,
         )
 
     def azimuth_compress(self, phase_history, radar, trajectory) -> SARImage:
@@ -119,18 +120,23 @@ class RangeDopplerAlgorithm(ImageFormationAlgorithm):
         # Range bin spacing (two-way)
         range_bin_spacing = C_LIGHT / (2.0 * phase_history.sample_rate)
 
+        # Near range from gate delay (bin 0 corresponds to this slant range)
+        near_range = phase_history.gate_delay * C_LIGHT / 2.0
+
         # Azimuth FFT -> Range-Doppler domain
         data_rd = np.fft.fft(data, axis=0)
 
         # RCMC: correct range cell migration per Doppler line
         if self._apply_rcmc:
+            near_range_bins = near_range / range_bin_spacing
             data_rd = self._apply_rcmc_correction(
-                data_rd, f_eta, wavelength, V, range_bin_spacing, n_az, n_rng
+                data_rd, f_eta, wavelength, V, range_bin_spacing, n_az, n_rng,
+                near_range_bins=near_range_bins,
             )
 
         # Azimuth matched filtering per range bin
         for rng_bin in range(n_rng):
-            R0 = rng_bin * range_bin_spacing
+            R0 = near_range + rng_bin * range_bin_spacing
             if R0 < 1.0:
                 continue
 
@@ -166,11 +172,17 @@ class RangeDopplerAlgorithm(ImageFormationAlgorithm):
         range_bin_spacing: float,
         n_az: int,
         n_rng: int,
+        near_range_bins: float = 0.0,
     ) -> np.ndarray:
         """Apply Range Cell Migration Correction in range-Doppler domain.
 
         Processes per Doppler line (row-wise) from a clean copy to avoid
         cross-contamination between range bins.
+
+        Parameters
+        ----------
+        near_range_bins : float
+            Near range offset in bin units (gate_delay * c/2 / range_bin_spacing).
         """
         data_corrected = data_rd.copy()
         range_bins = np.arange(n_rng, dtype=float)
@@ -185,8 +197,10 @@ class RangeDopplerAlgorithm(ImageFormationAlgorithm):
                 # No migration at zero Doppler
                 continue
 
-            # Source positions: target at range bin b is migrated to b/D_k
-            src_positions = range_bins / D_k
+            # Source positions: target at absolute range bin (near + b) migrates
+            # by factor 1/D_k. Convert back to array-relative coordinates.
+            abs_bins = near_range_bins + range_bins
+            src_positions = abs_bins / D_k - near_range_bins
 
             # Interpolate from original data to correct the migration
             row = data_rd[k, :]

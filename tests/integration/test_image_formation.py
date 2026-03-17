@@ -59,11 +59,11 @@ def _simulate_point_target(
     platform_start: np.ndarray | None = None,
     platform_velocity: np.ndarray | None = None,
 ) -> tuple:
-    """Simulate a single point target and return (raw_data, radar, trajectory).
+    """Simulate a single point target and return (raw_data, radar, trajectory, gate_delay).
 
     Returns
     -------
-    tuple of (RawData, Radar, Trajectory)
+    tuple of (RawData, Radar, Trajectory, float)
     """
     if platform_start is None:
         platform_start = np.array([0.0, -5000.0, 0.0])
@@ -98,6 +98,7 @@ def _simulate_point_target(
         prf=radar.prf,
         waveform_name=radar.waveform.name,
         sar_mode="stripmap",
+        gate_delay=result.gate_delay,
     )
 
     # Build Trajectory from simulation positions/velocities
@@ -108,7 +109,7 @@ def _simulate_point_target(
         attitude=np.zeros((n_pulses, 3)),
     )
 
-    return raw_data, radar, trajectory
+    return raw_data, radar, trajectory, result.gate_delay
 
 
 class TestRangeDopplerAlgorithm:
@@ -119,7 +120,7 @@ class TestRangeDopplerAlgorithm:
         from pySimSAR.algorithms.image_formation import RangeDopplerAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=256)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=256)
 
         rda = RangeDopplerAlgorithm()
         image = rda.process(raw_data, radar, trajectory)
@@ -147,7 +148,7 @@ class TestRangeDopplerAlgorithm:
 
         target_pos = np.array([5000.0, 0.0, 0.0])
         platform_start = np.array([0.0, -5000.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(
+        raw_data, radar, trajectory, gate_delay = _simulate_point_target(
             target_pos, platform_start=platform_start, n_pulses=256,
         )
 
@@ -164,7 +165,8 @@ class TestRangeDopplerAlgorithm:
 
         # Expected range bin
         range_bin_spacing = C_LIGHT / (2.0 * raw_data.sample_rate)
-        expected_bin = expected_range / range_bin_spacing
+        gate_near_range = gate_delay * C_LIGHT / 2.0
+        expected_bin = (expected_range - gate_near_range) / range_bin_spacing
 
         # Allow tolerance for RCMC shifts and interpolation effects
         assert abs(peak_rng - expected_bin) < 50, (
@@ -176,7 +178,7 @@ class TestRangeDopplerAlgorithm:
         from pySimSAR.algorithms.image_formation import RangeDopplerAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=256)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=256)
 
         rda = RangeDopplerAlgorithm()
         image = rda.process(raw_data, radar, trajectory)
@@ -186,25 +188,25 @@ class TestRangeDopplerAlgorithm:
         peak_az, peak_rng = np.unravel_index(np.argmax(magnitude), magnitude.shape)
         range_cut = magnitude[peak_az, :]
 
-        # Measure 3dB width in range
+        # Measure 3dB width in range (contiguous bins around peak)
         peak_val = range_cut[peak_rng]
         threshold = peak_val / np.sqrt(2)  # -3dB
 
-        # Find -3dB points
-        above = range_cut >= threshold
-        indices = np.where(above)[0]
-        if len(indices) > 1:
-            width_bins = indices[-1] - indices[0] + 1
-        else:
-            width_bins = 1
+        # Search outward from peak for contiguous -3dB width
+        left = peak_rng
+        while left > 0 and range_cut[left - 1] >= threshold:
+            left -= 1
+        right = peak_rng
+        while right < len(range_cut) - 1 and range_cut[right + 1] >= threshold:
+            right += 1
+        width_bins = right - left + 1
 
         # Theoretical range resolution: c / (2 * B)
         theoretical_res = C_LIGHT / (2.0 * radar.bandwidth)
         range_bin_spacing = C_LIGHT / (2.0 * raw_data.sample_rate)
         measured_res = width_bins * range_bin_spacing
 
-        # Allow within 100% since we use no windowing (main lobe is ~1 bin)
-        # and the bin-based measurement is coarse
+        # Allow within 5x since bin-based measurement is coarse at 2x sampling
         assert measured_res < 5 * theoretical_res, (
             f"Measured range resolution {measured_res:.2f}m vs "
             f"theoretical {theoretical_res:.2f}m"
@@ -216,7 +218,7 @@ class TestRangeDopplerAlgorithm:
 
         target_pos = np.array([5000.0, 0.0, 0.0])
         n_pulses = 256
-        raw_data, radar, trajectory = _simulate_point_target(
+        raw_data, radar, trajectory, _ = _simulate_point_target(
             target_pos, n_pulses=n_pulses
         )
 
@@ -269,6 +271,7 @@ class TestRangeDopplerAlgorithm:
             carrier_freq=radar.carrier_freq,
             bandwidth=radar.bandwidth,
             prf=radar.prf,
+            gate_delay=result.gate_delay,
         )
         trajectory = Trajectory(
             time=result.pulse_times,
@@ -304,7 +307,7 @@ class TestRangeDopplerAlgorithm:
         from pySimSAR.algorithms.image_formation import RangeDopplerAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=64)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=64)
 
         rda = RangeDopplerAlgorithm()
         image = rda.process(raw_data, radar, trajectory)
@@ -331,7 +334,7 @@ class TestTwoStepInterface:
         from pySimSAR.algorithms.image_formation import RangeDopplerAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=128)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=128)
 
         rda = RangeDopplerAlgorithm()
 
@@ -353,7 +356,7 @@ class TestTwoStepInterface:
         from pySimSAR.algorithms.image_formation import RangeDopplerAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=64)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=64)
 
         rda = RangeDopplerAlgorithm()
         phd = rda.range_compress(raw_data, radar)
@@ -371,7 +374,7 @@ class TestTwoStepInterface:
         from pySimSAR.algorithms.image_formation import RangeDopplerAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=64)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=64)
 
         rda = RangeDopplerAlgorithm()
         phd = rda.range_compress(raw_data, radar)
@@ -388,7 +391,7 @@ class TestTwoStepInterface:
 
         target_pos = np.array([5000.0, 0.0, 0.0])
         platform_start = np.array([0.0, -5000.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(
+        raw_data, radar, trajectory, gate_delay = _simulate_point_target(
             target_pos, platform_start=platform_start, n_pulses=64,
         )
 
@@ -396,6 +399,7 @@ class TestTwoStepInterface:
         phd = rda.range_compress(raw_data, radar)
 
         # Each pulse should have a peak near the expected range bin
+        gate_near_range = gate_delay * C_LIGHT / 2.0
         for pulse_idx in [0, 32, 63]:
             pulse_data = np.abs(phd.data[pulse_idx, :])
             peak_bin = np.argmax(pulse_data)
@@ -405,7 +409,7 @@ class TestTwoStepInterface:
                 target_pos - trajectory.position[pulse_idx]
             )
             range_bin_spacing = C_LIGHT / (2.0 * raw_data.sample_rate)
-            expected_bin = expected_range / range_bin_spacing
+            expected_bin = (expected_range - gate_near_range) / range_bin_spacing
 
             assert abs(peak_bin - expected_bin) < 5, (
                 f"Pulse {pulse_idx}: peak at bin {peak_bin}, "
@@ -421,7 +425,7 @@ class TestChirpScalingAlgorithm:
         from pySimSAR.algorithms.image_formation import ChirpScalingAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=256)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=256)
 
         csa = ChirpScalingAlgorithm()
         image = csa.process(raw_data, radar, trajectory)
@@ -449,7 +453,7 @@ class TestChirpScalingAlgorithm:
 
         target_pos = np.array([5000.0, 0.0, 0.0])
         platform_start = np.array([0.0, -5000.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(
+        raw_data, radar, trajectory, gate_delay = _simulate_point_target(
             target_pos, platform_start=platform_start, n_pulses=256,
         )
 
@@ -466,7 +470,8 @@ class TestChirpScalingAlgorithm:
 
         # Expected range bin
         range_bin_spacing = C_LIGHT / (2.0 * raw_data.sample_rate)
-        expected_bin = expected_range / range_bin_spacing
+        gate_near_range = gate_delay * C_LIGHT / 2.0
+        expected_bin = (expected_range - gate_near_range) / range_bin_spacing
 
         # Allow tolerance for processing shifts
         assert abs(peak_rng - expected_bin) < 50, (
@@ -478,7 +483,7 @@ class TestChirpScalingAlgorithm:
         from pySimSAR.algorithms.image_formation import ChirpScalingAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=256)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=256)
 
         csa = ChirpScalingAlgorithm()
         image = csa.process(raw_data, radar, trajectory)
@@ -488,16 +493,17 @@ class TestChirpScalingAlgorithm:
         peak_az, peak_rng = np.unravel_index(np.argmax(magnitude), magnitude.shape)
         range_cut = magnitude[peak_az, :]
 
-        # Measure 3dB width in range
+        # Measure 3dB width in range (contiguous mainlobe around peak)
         peak_val = range_cut[peak_rng]
         threshold = peak_val / np.sqrt(2)  # -3dB
 
-        above = range_cut >= threshold
-        indices = np.where(above)[0]
-        if len(indices) > 1:
-            width_bins = indices[-1] - indices[0] + 1
-        else:
-            width_bins = 1
+        left = peak_rng
+        while left > 0 and range_cut[left - 1] >= threshold:
+            left -= 1
+        right = peak_rng
+        while right < len(range_cut) - 1 and range_cut[right + 1] >= threshold:
+            right += 1
+        width_bins = right - left + 1
 
         # Theoretical range resolution: c / (2 * B)
         theoretical_res = C_LIGHT / (2.0 * radar.bandwidth)
@@ -515,7 +521,7 @@ class TestChirpScalingAlgorithm:
 
         target_pos = np.array([5000.0, 0.0, 0.0])
         n_pulses = 256
-        raw_data, radar, trajectory = _simulate_point_target(
+        raw_data, radar, trajectory, _ = _simulate_point_target(
             target_pos, n_pulses=n_pulses
         )
 
@@ -542,7 +548,7 @@ class TestChirpScalingAlgorithm:
         from pySimSAR.algorithms.image_formation import ChirpScalingAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=128)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=128)
 
         csa = ChirpScalingAlgorithm()
 
@@ -573,7 +579,7 @@ class TestChirpScalingAlgorithm:
         from pySimSAR.algorithms.image_formation import ChirpScalingAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=64)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=64)
 
         csa = ChirpScalingAlgorithm()
         image = csa.process(raw_data, radar, trajectory)
@@ -590,7 +596,7 @@ class TestOmegaKAlgorithm:
         from pySimSAR.algorithms.image_formation import OmegaKAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=256)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=256)
 
         omk = OmegaKAlgorithm()
         image = omk.process(raw_data, radar, trajectory)
@@ -618,7 +624,7 @@ class TestOmegaKAlgorithm:
 
         target_pos = np.array([5000.0, 0.0, 0.0])
         platform_start = np.array([0.0, -5000.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(
+        raw_data, radar, trajectory, gate_delay = _simulate_point_target(
             target_pos, platform_start=platform_start, n_pulses=256,
         )
 
@@ -635,7 +641,8 @@ class TestOmegaKAlgorithm:
 
         # Expected range bin
         range_bin_spacing = C_LIGHT / (2.0 * raw_data.sample_rate)
-        expected_bin = expected_range / range_bin_spacing
+        gate_near_range = gate_delay * C_LIGHT / 2.0
+        expected_bin = (expected_range - gate_near_range) / range_bin_spacing
 
         # Allow tolerance for Stolt interpolation shifts
         assert abs(peak_rng - expected_bin) < 50, (
@@ -647,7 +654,7 @@ class TestOmegaKAlgorithm:
         from pySimSAR.algorithms.image_formation import OmegaKAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=256)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=256)
 
         omk = OmegaKAlgorithm()
         image = omk.process(raw_data, radar, trajectory)
@@ -657,16 +664,17 @@ class TestOmegaKAlgorithm:
         peak_az, peak_rng = np.unravel_index(np.argmax(magnitude), magnitude.shape)
         range_cut = magnitude[peak_az, :]
 
-        # Measure 3dB width in range
+        # Measure 3dB width in range (contiguous mainlobe around peak)
         peak_val = range_cut[peak_rng]
         threshold = peak_val / np.sqrt(2)  # -3dB
 
-        above = range_cut >= threshold
-        indices = np.where(above)[0]
-        if len(indices) > 1:
-            width_bins = indices[-1] - indices[0] + 1
-        else:
-            width_bins = 1
+        left = peak_rng
+        while left > 0 and range_cut[left - 1] >= threshold:
+            left -= 1
+        right = peak_rng
+        while right < len(range_cut) - 1 and range_cut[right + 1] >= threshold:
+            right += 1
+        width_bins = right - left + 1
 
         # Theoretical range resolution: c / (2 * B)
         theoretical_res = C_LIGHT / (2.0 * radar.bandwidth)
@@ -684,7 +692,7 @@ class TestOmegaKAlgorithm:
 
         target_pos = np.array([5000.0, 0.0, 0.0])
         n_pulses = 256
-        raw_data, radar, trajectory = _simulate_point_target(
+        raw_data, radar, trajectory, _ = _simulate_point_target(
             target_pos, n_pulses=n_pulses
         )
 
@@ -711,7 +719,7 @@ class TestOmegaKAlgorithm:
         from pySimSAR.algorithms.image_formation import OmegaKAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=128)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=128)
 
         omk = OmegaKAlgorithm()
 
@@ -742,7 +750,7 @@ class TestOmegaKAlgorithm:
         from pySimSAR.algorithms.image_formation import OmegaKAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        raw_data, radar, trajectory = _simulate_point_target(target_pos, n_pulses=64)
+        raw_data, radar, trajectory, _ = _simulate_point_target(target_pos, n_pulses=64)
 
         omk = OmegaKAlgorithm()
         image = omk.process(raw_data, radar, trajectory)

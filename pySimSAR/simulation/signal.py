@@ -72,14 +72,15 @@ def compute_path_loss(
     wavelength: float,
     transmit_power: float,
     system_losses_dB: float,
+    receiver_gain_dB: float = 0.0,
 ) -> float:
     """Compute received signal amplitude factor from the radar range equation.
 
     The radar range equation gives received power as:
-        P_r = (P_t * G_t * G_r * lambda^2 * sigma) / ((4*pi)^3 * R^4 * L)
+        P_r = (P_t * G_rx * lambda^2 * sigma) / ((4*pi)^3 * R^4 * L)
 
     This function returns the amplitude factor excluding RCS and antenna gains:
-        A = sqrt(P_t * lambda^2 / ((4*pi)^3 * R^4 * L))
+        A = sqrt(P_t * G_rx * lambda^2 / ((4*pi)^3 * R^4 * L))
 
     Parameters
     ----------
@@ -91,6 +92,8 @@ def compute_path_loss(
         Transmit power in Watts.
     system_losses_dB : float
         System losses in dB.
+    receiver_gain_dB : float
+        Receiver gain in dB (default 0.0).
 
     Returns
     -------
@@ -100,7 +103,8 @@ def compute_path_loss(
     if slant_range <= 0:
         return 0.0
     losses_linear = 10.0 ** (system_losses_dB / 10.0)
-    numerator = transmit_power * wavelength**2
+    g_rx_linear = 10.0 ** (receiver_gain_dB / 10.0)
+    numerator = transmit_power * g_rx_linear * wavelength**2
     denominator = (4.0 * np.pi) ** 3 * slant_range**4 * losses_linear
     return float(np.sqrt(numerator / denominator))
 
@@ -193,6 +197,7 @@ def compute_target_echo(
     target_velocity: np.ndarray | None = None,
     tx_signal: np.ndarray | None = None,
     phase_noise: np.ndarray | None = None,
+    gate_delay: float = 0.0,
 ) -> np.ndarray:
     """Compute the echo signal from a single point target for one pulse.
 
@@ -224,6 +229,9 @@ def compute_target_echo(
     phase_noise : np.ndarray | None
         Phase noise vector for this pulse. If provided, range
         decorrelation is applied.
+    gate_delay : float
+        Range gate start delay in seconds. The first sample in the
+        output corresponds to this round-trip delay.
 
     Returns
     -------
@@ -236,16 +244,17 @@ def compute_target_echo(
     if slant_range <= 0:
         return echo
 
-    # Round-trip delay
-    delay = compute_round_trip_delay(slant_range)
+    # Round-trip delay relative to range gate start
+    delay = compute_round_trip_delay(slant_range) - gate_delay
     delay_samples = int(np.round(delay * sample_rate))
 
-    if delay_samples >= n_samples:
+    if delay_samples < 0 or delay_samples >= n_samples:
         return echo
 
     # Amplitude from radar range equation (excluding RCS and antenna gain)
     amplitude = compute_path_loss(
-        slant_range, radar.wavelength, radar.transmit_power, radar.system_losses
+        slant_range, radar.wavelength, radar.transmit_power, radar.system_losses,
+        getattr(radar, 'receiver_gain', 0.0),
     )
     # Include RCS and two-way gain
     amplitude *= np.sqrt(target_rcs) * np.sqrt(two_way_gain_linear)
@@ -297,6 +306,7 @@ def compute_distributed_target_echoes(
     two_way_gain_func=None,
     tx_signal: np.ndarray | None = None,
     phase_noise: np.ndarray | None = None,
+    gate_delay: float = 0.0,
 ) -> np.ndarray:
     """Compute echo from a distributed target grid.
 
@@ -371,6 +381,7 @@ def compute_distributed_target_echoes(
                 two_way_gain_linear=gain,
                 tx_signal=tx_signal,
                 phase_noise=phase_noise,
+                gate_delay=gate_delay,
             )
 
     return echo

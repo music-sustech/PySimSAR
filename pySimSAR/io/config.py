@@ -295,19 +295,29 @@ class ProcessingConfig:
     def __init__(
         self,
         image_formation: str,
+        image_formation_params: dict | None = None,
         moco: str | None = None,
+        moco_params: dict | None = None,
         autofocus: str | None = None,
+        autofocus_params: dict | None = None,
         geocoding: str | None = None,
+        geocoding_params: dict | None = None,
         polarimetric_decomposition: str | None = None,
+        polarimetric_decomposition_params: dict | None = None,
         description: str = "",
     ) -> None:
         if not image_formation:
             raise ValueError("image_formation algorithm name is required")
         self._image_formation = image_formation
+        self._image_formation_params = image_formation_params or {}
         self._moco = moco
+        self._moco_params = moco_params or {}
         self._autofocus = autofocus
+        self._autofocus_params = autofocus_params or {}
         self._geocoding = geocoding
+        self._geocoding_params = geocoding_params or {}
         self._polarimetric_decomposition = polarimetric_decomposition
+        self._polarimetric_decomposition_params = polarimetric_decomposition_params or {}
         self._description = str(description)
 
     @property
@@ -315,20 +325,40 @@ class ProcessingConfig:
         return self._image_formation
 
     @property
+    def image_formation_params(self) -> dict:
+        return self._image_formation_params
+
+    @property
     def moco(self) -> str | None:
         return self._moco
+
+    @property
+    def moco_params(self) -> dict:
+        return self._moco_params
 
     @property
     def autofocus(self) -> str | None:
         return self._autofocus
 
     @property
+    def autofocus_params(self) -> dict:
+        return self._autofocus_params
+
+    @property
     def geocoding(self) -> str | None:
         return self._geocoding
 
     @property
+    def geocoding_params(self) -> dict:
+        return self._geocoding_params
+
+    @property
     def polarimetric_decomposition(self) -> str | None:
         return self._polarimetric_decomposition
+
+    @property
+    def polarimetric_decomposition_params(self) -> dict:
+        return self._polarimetric_decomposition_params
 
     @property
     def description(self) -> str:
@@ -338,10 +368,15 @@ class ProcessingConfig:
         """Serialize to JSON string."""
         data = {
             "image_formation": self._image_formation,
+            "image_formation_params": self._image_formation_params,
             "moco": self._moco,
+            "moco_params": self._moco_params,
             "autofocus": self._autofocus,
+            "autofocus_params": self._autofocus_params,
             "geocoding": self._geocoding,
+            "geocoding_params": self._geocoding_params,
             "polarimetric_decomposition": self._polarimetric_decomposition,
+            "polarimetric_decomposition_params": self._polarimetric_decomposition_params,
             "description": self._description,
         }
         return json.dumps(data, indent=2)
@@ -352,10 +387,15 @@ class ProcessingConfig:
         data = json.loads(json_str)
         return cls(
             image_formation=data["image_formation"],
+            image_formation_params=data.get("image_formation_params"),
             moco=data.get("moco"),
+            moco_params=data.get("moco_params"),
             autofocus=data.get("autofocus"),
+            autofocus_params=data.get("autofocus_params"),
             geocoding=data.get("geocoding"),
+            geocoding_params=data.get("geocoding_params"),
             polarimetric_decomposition=data.get("polarimetric_decomposition"),
+            polarimetric_decomposition_params=data.get("polarimetric_decomposition_params"),
             description=data.get("description", ""),
         )
 

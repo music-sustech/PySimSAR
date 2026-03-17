@@ -1,40 +1,23 @@
+# Virtual environments
+.venv/
+
 # Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 *.egg-info/
 dist/
 build/
-*.egg
-.eggs/
 
-# Virtual environments
-.venv/
-venv/
-env/
+# Tool caches
+.pytest_cache/
+.ruff_cache/
 
-# IDE
+# Generated images (regenerable from scripts)
+demos/*.png
+tests/golden/**/*.png
+
+# IDE / OS
 .vscode/
 .idea/
 *.swp
-*.swo
-*~
-
-# OS
-.DS_Store
 Thumbs.db
-
-# Testing
-.coverage
-htmlcov/
-.pytest_cache/
-
-# Environment
-.env
-.env.*
-
-# HDF5 simulation outputs
-*.h5
-
-# Ruff
-.ruff_cache/

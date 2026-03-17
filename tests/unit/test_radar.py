@@ -1,4 +1,4 @@
-"""Unit tests for AntennaPattern and Radar (T024, T025)."""
+"""Unit tests for AntennaPattern and Radar (T024, T025, T096a, T096j)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,9 @@ import warnings
 import numpy as np
 import pytest
 
-from pySimSAR.core.radar import AntennaPattern, C_LIGHT, K_BOLTZMANN, Radar
+from pySimSAR.core.radar import (
+    AntennaPattern, C_LIGHT, K_BOLTZMANN, Radar, create_antenna_from_preset,
+)
 from pySimSAR.core.types import LookSide, PolarizationMode, SARMode
 from pySimSAR.waveforms.base import Waveform
 
@@ -220,9 +222,11 @@ class TestRadar:
         assert basic_radar.wavelength == pytest.approx(expected)
 
     def test_noise_power_property(self, basic_radar):
-        """noise_power = k * T * B * F (linear)."""
-        f_linear = 10.0 ** (3.0 / 10.0)
-        expected = K_BOLTZMANN * 290.0 * 50e6 * f_linear
+        """noise_power = k * T * B * F_total * G_rx."""
+        # basic_radar: noise_figure=3.0, system_losses=2.0, receiver_gain=0.0
+        f_total = 10.0 ** (2.0 / 10.0) * 10.0 ** (3.0 / 10.0)  # L_sys * F_rx
+        g_rx = 10.0 ** (0.0 / 10.0)  # 1.0
+        expected = K_BOLTZMANN * 290.0 * 50e6 * f_total * g_rx
         assert basic_radar.noise_power == pytest.approx(expected, rel=1e-10)
 
     def test_string_to_enum_conversion(self, mock_waveform, array_pattern):
@@ -395,3 +399,190 @@ class TestRadar:
             assert "duration" in str(w[0].message).lower() or "PRI" in str(
                 w[0].message
             )
+
+
+# ---------------------------------------------------------------------------
+# Receiver gain tests (T096a)
+# ---------------------------------------------------------------------------
+
+class TestRadarReceiverGain:
+    """Tests for Radar with receiver_gain_dB."""
+
+    def test_default_receiver_gain(self, basic_radar):
+        """Default receiver_gain is 0 dB."""
+        assert basic_radar.receiver_gain == 0.0
+
+    def test_custom_receiver_gain(self, mock_waveform, array_pattern):
+        """Custom receiver_gain is stored correctly."""
+        r = Radar(
+            carrier_freq=9.65e9,
+            prf=1000.0,
+            transmit_power=500.0,
+            waveform=mock_waveform,
+            antenna=array_pattern,
+            polarization="single",
+            mode="stripmap",
+            look_side="right",
+            depression_angle=0.7,
+            receiver_gain_dB=30.0,
+        )
+        assert r.receiver_gain == 30.0
+
+    def test_negative_receiver_gain_raises(self, mock_waveform, array_pattern):
+        """Negative receiver_gain_dB raises ValueError."""
+        with pytest.raises(ValueError, match="receiver_gain_dB"):
+            Radar(
+                carrier_freq=9.65e9,
+                prf=1000.0,
+                transmit_power=500.0,
+                waveform=mock_waveform,
+                antenna=array_pattern,
+                polarization="single",
+                mode="stripmap",
+                look_side="right",
+                depression_angle=0.7,
+                receiver_gain_dB=-1.0,
+            )
+
+    def test_total_noise_figure(self, mock_waveform, array_pattern):
+        """total_noise_figure = L_sys * F_rx in dB."""
+        r = Radar(
+            carrier_freq=9.65e9,
+            prf=1000.0,
+            transmit_power=500.0,
+            waveform=mock_waveform,
+            antenna=array_pattern,
+            polarization="single",
+            mode="stripmap",
+            look_side="right",
+            depression_angle=0.7,
+            noise_figure=3.0,
+            system_losses=2.0,
+        )
+        # F_total = L_sys * F_rx = 10^(2/10) * 10^(3/10) = 1.585 * 1.995 = 3.162
+        # F_total_dB = 10*log10(3.162) = 5.0 dB
+        expected = 10.0 * np.log10(10.0 ** (2.0 / 10.0) * 10.0 ** (3.0 / 10.0))
+        assert r.total_noise_figure == pytest.approx(expected, rel=1e-10)
+
+    def test_noise_power_with_receiver_gain(self, mock_waveform, array_pattern):
+        """noise_power = k * T * B * F_total * G_rx."""
+        r = Radar(
+            carrier_freq=9.65e9,
+            prf=1000.0,
+            transmit_power=500.0,
+            waveform=mock_waveform,
+            antenna=array_pattern,
+            polarization="single",
+            mode="stripmap",
+            look_side="right",
+            depression_angle=0.7,
+            noise_figure=3.0,
+            system_losses=2.0,
+            receiver_gain_dB=30.0,
+        )
+        f_total_lin = 10.0 ** (2.0 / 10.0) * 10.0 ** (3.0 / 10.0)
+        g_rx_lin = 10.0 ** (30.0 / 10.0)
+        expected = K_BOLTZMANN * 290.0 * 50e6 * f_total_lin * g_rx_lin
+        assert r.noise_power == pytest.approx(expected, rel=1e-10)
+
+    def test_noise_power_backward_compatible(self, mock_waveform, array_pattern):
+        """With receiver_gain=0 and system_losses=0, noise_power matches old formula."""
+        r = Radar(
+            carrier_freq=9.65e9,
+            prf=1000.0,
+            transmit_power=500.0,
+            waveform=mock_waveform,
+            antenna=array_pattern,
+            polarization="single",
+            mode="stripmap",
+            look_side="right",
+            depression_angle=0.7,
+            noise_figure=3.0,
+            system_losses=0.0,
+            receiver_gain_dB=0.0,
+        )
+        # With L_sys=0dB, G_rx=0dB: noise_power = k*T*B*F_rx (old formula)
+        f_rx = 10.0 ** (3.0 / 10.0)
+        expected = K_BOLTZMANN * 290.0 * 50e6 * f_rx
+        assert r.noise_power == pytest.approx(expected, rel=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# Antenna preset tests (T096j)
+# ---------------------------------------------------------------------------
+
+class TestAntennaPresets:
+    """Tests for create_antenna_from_preset() factory."""
+
+    def test_flat_preset_boresight(self):
+        """Flat preset: peak gain at boresight."""
+        bw_az = np.radians(3.0)
+        bw_el = np.radians(10.0)
+        ant = create_antenna_from_preset("flat", bw_az, bw_el, 30.0)
+        assert ant.gain(0.0, 0.0) == pytest.approx(30.0)
+
+    def test_flat_preset_outside_beam(self):
+        """Flat preset: -60 dB floor outside beam."""
+        bw_az = np.radians(3.0)
+        bw_el = np.radians(10.0)
+        ant = create_antenna_from_preset("flat", bw_az, bw_el, 30.0)
+        # Well outside beam
+        g = ant.gain(np.radians(10.0), 0.0)
+        assert g == pytest.approx(30.0 - 60.0)
+
+    def test_sinc_preset_boresight(self):
+        """Sinc preset: peak gain at boresight."""
+        bw_az = np.radians(3.0)
+        bw_el = np.radians(10.0)
+        ant = create_antenna_from_preset("sinc", bw_az, bw_el, 30.0)
+        assert ant.gain(0.0, 0.0) == pytest.approx(30.0)
+
+    def test_sinc_preset_3dB_beamwidth(self):
+        """Sinc preset: ~3 dB down at half-beamwidth."""
+        bw_az = np.radians(3.0)
+        bw_el = np.radians(10.0)
+        ant = create_antenna_from_preset("sinc", bw_az, bw_el, 30.0)
+        # At half-beamwidth in azimuth: sinc(0.886 * 0.5) = sinc(0.443)
+        # The 3 dB point for sinc is at ~0.443/0.886 * bw = bw/2
+        g = ant.gain(bw_az / 2.0, 0.0)
+        drop = 30.0 - g
+        # Should be approximately 3 dB (sinc(0.443) ≈ 0.707 -> -3.01 dB)
+        assert 2.5 < drop < 4.0
+
+    def test_gaussian_preset_boresight(self):
+        """Gaussian preset: peak gain at boresight."""
+        bw_az = np.radians(3.0)
+        bw_el = np.radians(10.0)
+        ant = create_antenna_from_preset("gaussian", bw_az, bw_el, 30.0)
+        assert ant.gain(0.0, 0.0) == pytest.approx(30.0)
+
+    def test_gaussian_preset_3dB_beamwidth(self):
+        """Gaussian preset: exactly 3 dB down at half-beamwidth."""
+        bw_az = np.radians(3.0)
+        bw_el = np.radians(10.0)
+        ant = create_antenna_from_preset("gaussian", bw_az, bw_el, 30.0)
+        # K=12: loss = 12 * (0.5)^2 = 3.0 dB exactly
+        g = ant.gain(bw_az / 2.0, 0.0)
+        assert g == pytest.approx(27.0)
+
+    def test_gaussian_preset_elevation(self):
+        """Gaussian preset: 3 dB down at half-beamwidth in elevation."""
+        bw_az = np.radians(3.0)
+        bw_el = np.radians(10.0)
+        ant = create_antenna_from_preset("gaussian", bw_az, bw_el, 30.0)
+        g = ant.gain(0.0, bw_el / 2.0)
+        assert g == pytest.approx(27.0)
+
+    def test_unknown_preset_raises(self):
+        """Unknown preset name raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown antenna preset"):
+            create_antenna_from_preset("unknown", 0.05, 0.1, 30.0)
+
+    def test_preset_returns_antenna_pattern(self):
+        """All presets return AntennaPattern instances."""
+        for name in ("flat", "sinc", "gaussian"):
+            ant = create_antenna_from_preset(name, 0.05, 0.1, 30.0)
+            assert isinstance(ant, AntennaPattern)
+            assert ant.az_beamwidth == 0.05
+            assert ant.el_beamwidth == 0.1
+            assert ant.peak_gain_dB == 30.0

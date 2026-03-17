@@ -119,6 +119,7 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
             prf=raw_data.prf,
             waveform_name=raw_data.waveform_name,
             sar_mode=raw_data.sar_mode,
+            gate_delay=raw_data.gate_delay,
         )
 
     def _align_positions(
