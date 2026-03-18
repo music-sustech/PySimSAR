@@ -245,7 +245,7 @@ class SimulationConfig:
             data["platform"] = {
                 "velocity": self._platform.velocity,
                 "altitude": self._platform.altitude,
-                "heading": self._platform.heading,
+                "heading": self._platform.heading_vector.tolist(),
             }
         return json.dumps(data, default=_json_default, indent=2)
 

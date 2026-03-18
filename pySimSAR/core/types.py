@@ -204,6 +204,7 @@ class SARImage:
     geometry: str = "slant_range"
     algorithm: str = ""
     channel: str = "single"
+    near_range: float = 0.0
     geo_transform: np.ndarray | None = None
     projection_wkt: str | None = None
 

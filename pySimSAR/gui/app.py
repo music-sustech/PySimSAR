@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
 )
 
 from pySimSAR.gui.widgets.param_editor import (
+    AntennaParamEditor,
     RadarParamEditor,
     WaveformParamEditor,
     PlatformParamEditor,
@@ -46,7 +47,13 @@ from pySimSAR.core.platform import Platform
 from pySimSAR.core.types import SARImage
 from pySimSAR.waveforms.lfm import LFMWaveform
 from pySimSAR.waveforms.fmcw import FMCWWaveform
+from pySimSAR.waveforms.phase_noise import CompositePSDPhaseNoise
 from pySimSAR.io.config import ProcessingConfig
+from pySimSAR.motion.perturbation import DrydenTurbulence
+from pySimSAR.sensors.gps import GPSSensor
+from pySimSAR.sensors.gps_gaussian import GaussianGPSError
+from pySimSAR.sensors.imu import IMUSensor
+from pySimSAR.sensors.imu_white_noise import WhiteNoiseIMUError
 
 
 class MainWindow(QMainWindow):
@@ -73,6 +80,9 @@ class MainWindow(QMainWindow):
         self._build_toolbar()
         self._build_status_bar()
         self._build_central_widget()
+
+        # Show initial scene preview (platform trajectory)
+        self._update_scene_preview()
 
     # ==================================================================
     # UI construction
@@ -149,6 +159,7 @@ class MainWindow(QMainWindow):
 
         self._sim_editor = SimulationParamEditor()
         self._radar_editor = RadarParamEditor()
+        self._antenna_editor = AntennaParamEditor()
         self._waveform_editor = WaveformParamEditor()
         self._platform_editor = PlatformParamEditor()
         self._scene_editor = SceneParamEditor()
@@ -156,11 +167,19 @@ class MainWindow(QMainWindow):
 
         sidebar_layout.addWidget(self._sim_editor)
         sidebar_layout.addWidget(self._radar_editor)
+        sidebar_layout.addWidget(self._antenna_editor)
         sidebar_layout.addWidget(self._waveform_editor)
         sidebar_layout.addWidget(self._platform_editor)
         sidebar_layout.addWidget(self._scene_editor)
         sidebar_layout.addWidget(self._algorithm_selector)
         sidebar_layout.addStretch()
+
+        # Live-update scene preview when params change
+        self._scene_editor.params_changed.connect(self._update_scene_preview)
+        self._platform_editor.params_changed.connect(self._update_scene_preview)
+        self._sim_editor.params_changed.connect(self._update_scene_preview)
+        self._radar_editor.params_changed.connect(self._update_scene_preview)
+        self._antenna_editor.params_changed.connect(self._update_scene_preview)
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -191,6 +210,60 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(splitter)
 
     # ==================================================================
+    # Live scene preview
+    # ==================================================================
+
+    def _update_scene_preview(self) -> None:
+        """Refresh the 3D scene panel with current targets and platform."""
+        try:
+            scene_params = self._scene_editor.get_params()
+            scene = Scene(
+                origin_lat=scene_params["origin_lat"],
+                origin_lon=scene_params["origin_lon"],
+                origin_alt=scene_params["origin_alt"],
+            )
+            for t in scene_params.get("targets", []):
+                pos = np.array(t["position"], dtype=float)
+                scene.add_target(PointTarget(position=pos, rcs=t["rcs"]))
+            self._scene_panel.update_scene(scene)
+
+            # Show platform start and projected trajectory
+            plat_params = self._platform_editor.get_params()
+            start = np.array(plat_params["start_position"], dtype=float)
+            sim_params = self._sim_editor.get_params()
+            radar_params = self._radar_editor.get_params()
+
+            # Compute projected trajectory line
+            n_pulses = sim_params["n_pulses"]
+            prf = radar_params["prf"]
+            velocity = plat_params["velocity"]
+            heading_vec = np.array(plat_params["heading"], dtype=float)
+            h_norm = np.linalg.norm(heading_vec)
+            if h_norm < 1e-12:
+                heading_vec = np.array([0.0, 1.0, 0.0])
+            else:
+                heading_vec = heading_vec / h_norm
+            vel_vec = velocity * heading_vec
+            heading_rad = float(np.arctan2(heading_vec[0], heading_vec[1]))
+            dt = 1.0 / prf if prf > 0 else 0.001
+            total_time = n_pulses * dt
+            times = np.linspace(0, total_time, min(n_pulses, 500))
+            traj = np.column_stack([
+                start[0] + vel_vec[0] * times,
+                start[1] + vel_vec[1] * times,
+                start[2] + vel_vec[2] * times,
+            ])
+            self._scene_panel.update_platform(
+                start_position=start,
+                trajectory_positions=traj,
+                depression_angle=math.degrees(radar_params["depression_angle"]),
+                look_side=radar_params["look_side"],
+                heading_rad=heading_rad,
+            )
+        except Exception:
+            pass  # Non-critical, don't block the user
+
+    # ==================================================================
     # Model building helpers
     # ==================================================================
 
@@ -207,30 +280,56 @@ class MainWindow(QMainWindow):
         )
         for t in scene_params.get("targets", []):
             pos = np.array(t["position"], dtype=float)
-            scene.add_point_target(PointTarget(position=pos, rcs=t["rcs"]))
+            vel = t.get("velocity")
+            if vel is not None:
+                vel = np.array(vel, dtype=float)
+            scene.add_target(PointTarget(position=pos, rcs=t["rcs"], velocity=vel))
         model.scene = scene
 
         # -- Waveform --
         wf_params = self._waveform_editor.get_params()
+        # Build optional phase noise model
+        phase_noise = None
+        pn = wf_params.get("phase_noise")
+        if pn is not None:
+            phase_noise = CompositePSDPhaseNoise(
+                flicker_fm_level=pn["flicker_fm_level"],
+                white_fm_level=pn["white_fm_level"],
+                flicker_pm_level=pn["flicker_pm_level"],
+                white_floor=pn["white_floor"],
+            )
+        # Build optional window function
+        window = wf_params.get("window")
+        if window is not None:
+            window = getattr(np, window, None)
+
         if wf_params["waveform_type"] == "LFM":
             waveform = LFMWaveform(
                 bandwidth=wf_params["bandwidth"],
-                duty_cycle=wf_params.get("duty_cycle", 0.1),
+                duty_cycle=wf_params.get("duty_cycle", 0.01),
+                phase_noise=phase_noise,
+                window=window,
             )
         else:
             waveform = FMCWWaveform(
                 bandwidth=wf_params["bandwidth"],
+                duty_cycle=wf_params.get("duty_cycle", 1.0),
                 ramp_type=wf_params.get("ramp_type", "up"),
+                phase_noise=phase_noise,
+                window=window,
             )
+
+        # -- Antenna --
+        ant_params = self._antenna_editor.get_params()
+        antenna = create_antenna_from_preset(
+            preset=ant_params["preset"],
+            az_beamwidth=ant_params["az_beamwidth"],
+            el_beamwidth=ant_params["el_beamwidth"],
+            peak_gain_dB=ant_params["peak_gain_dB"],
+        )
 
         # -- Radar --
         radar_params = self._radar_editor.get_params()
-        antenna = create_antenna_from_preset(
-            preset="flat",
-            az_beamwidth=math.radians(10.0),
-            el_beamwidth=math.radians(10.0),
-            peak_gain_dB=30.0,
-        )
         model.radar = Radar(
             carrier_freq=radar_params["carrier_freq"],
             prf=radar_params["prf"],
@@ -241,22 +340,61 @@ class MainWindow(QMainWindow):
             mode=radar_params["mode"],
             look_side=radar_params["look_side"],
             depression_angle=radar_params["depression_angle"],
+            squint_angle=radar_params["squint_angle"],
+            receiver_gain_dB=radar_params["receiver_gain_dB"],
+            system_losses=radar_params["system_losses"],
+            noise_figure=radar_params["noise_figure"],
+            reference_temp=radar_params["reference_temp"],
         )
 
         # -- Platform --
         plat_params = self._platform_editor.get_params()
         start_pos = np.array(plat_params["start_position"], dtype=float)
+        perturbation = None
+        if plat_params.get("perturbation") is not None:
+            p = plat_params["perturbation"]
+            perturbation = DrydenTurbulence(
+                sigma_u=p["sigma_u"],
+                sigma_v=p["sigma_v"],
+                sigma_w=p["sigma_w"],
+            )
+        sensors = []
+        if plat_params.get("gps") is not None:
+            g = plat_params["gps"]
+            sensors.append(GPSSensor(
+                accuracy_rms=g["accuracy"],
+                update_rate=g["rate"],
+                error_model=GaussianGPSError(sigma=g["accuracy"]),
+            ))
+        if plat_params.get("imu") is not None:
+            i = plat_params["imu"]
+            sensors.append(IMUSensor(
+                accel_noise_density=i["accel_noise"],
+                gyro_noise_density=i["gyro_noise"],
+                sample_rate=i["rate"],
+                error_model=WhiteNoiseIMUError(
+                    accel_noise_density=i["accel_noise"],
+                    gyro_noise_density=i["gyro_noise"],
+                ),
+            ))
         model.platform = Platform(
             velocity=plat_params["velocity"],
             altitude=plat_params["altitude"],
-            heading=math.radians(plat_params["heading"]),
+            heading=np.array(plat_params["heading"], dtype=float),
             start_position=start_pos,
+            perturbation=perturbation,
+            sensors=sensors if sensors else None,
         )
 
         # -- Simulation --
         sim_params = self._sim_editor.get_params()
         model.n_pulses = sim_params["n_pulses"]
         model.seed = sim_params["seed"]
+        model.swath_range = sim_params.get("swath_range")
+        model.sample_rate = sim_params.get("sample_rate")
+        model.scene_center = sim_params.get("scene_center")
+        model.n_subswaths = sim_params.get("n_subswaths", 3)
+        model.burst_length = sim_params.get("burst_length", 20)
 
         # -- Processing config --
         model.processing_config = self._algorithm_selector.get_config()
@@ -334,9 +472,8 @@ class MainWindow(QMainWindow):
 
     def _update_panels(self, model: ProjectModel) -> None:
         """Push simulation/pipeline results into the visualization panels."""
-        # Scene
-        if model.scene is not None:
-            self._scene_panel.update_scene(model.scene)
+        # Scene + platform (re-add both so platform isn't lost)
+        self._update_scene_preview()
 
         # Trajectories
         if model.simulation_result is not None:
@@ -369,33 +506,51 @@ class MainWindow(QMainWindow):
     def _on_new_project(self) -> None:
         """Reset all editors and panels to defaults."""
         # Reset editors to default values
-        self._sim_editor.set_params({"n_pulses": 256, "seed": 42})
+        self._sim_editor.set_params({
+            "n_pulses": 512, "seed": 42, "swath_range": (1350.0, 1500.0),
+            "sample_rate": None, "scene_center": [0, 0, 0],
+            "n_subswaths": 3, "burst_length": 20,
+        })
         self._radar_editor.set_params({
             "carrier_freq": 9.65e9,
             "prf": 1000.0,
             "transmit_power": 1000.0,
-            "bandwidth": 100e6,
+            "receiver_gain_dB": 30.0,
+            "system_losses": 2.0,
+            "noise_figure": 3.0,
+            "squint_angle": 0.0,
+            "reference_temp": 290.0,
             "polarization": "single",
             "mode": "stripmap",
             "look_side": "right",
             "depression_angle": 0.7854,
         })
+        self._antenna_editor.set_params({
+            "preset": "flat",
+            "az_beamwidth": math.radians(10.0),
+            "el_beamwidth": math.radians(10.0),
+            "peak_gain_dB": 30.0,
+        })
         self._waveform_editor.set_params({
             "waveform_type": "LFM",
             "bandwidth": 100e6,
-            "duty_cycle": 0.1,
+            "duty_cycle": 0.01,
+            "window": None,
+            "phase_noise": None,
         })
         self._platform_editor.set_params({
             "velocity": 100.0,
-            "altitude": 5000.0,
-            "heading": 0.0,
-            "start_position": [0.0, 0.0, 5000.0],
+            "heading": [0.0, 1.0, 0.0],
+            "start_position": [0.0, -25.0, 1000.0],
+            "perturbation": None,
+            "gps": None,
+            "imu": None,
         })
         self._scene_editor.set_params({
             "origin_lat": 0.0,
             "origin_lon": 0.0,
             "origin_alt": 0.0,
-            "targets": [],
+            "targets": [{"position": [1000, 0, 0], "rcs": 1.0}],
         })
 
         # Clear panels

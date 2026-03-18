@@ -7,6 +7,7 @@ import pyqtgraph.opengl as gl
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from pySimSAR.gui.panels.scene_3d import _ScalingAxes
 from pySimSAR.motion.trajectory import Trajectory
 
 
@@ -30,9 +31,12 @@ class TrajectoryViewerPanel(QWidget):
 
         # Axis grid
         self._grid = gl.GLGridItem()
-        self._grid.setSize(1000, 1000, 1)
-        self._grid.setSpacing(100, 100, 0)
+        self._grid.setSize(10000, 10000, 1)
+        self._grid.setSpacing(1000, 1000, 0)
         self._view.addItem(self._grid)
+
+        # XYZ axes (scale with camera zoom)
+        self._axes = _ScalingAxes(self._view)
 
         # Line plot items
         self._ideal_line: gl.GLLinePlotItem | None = None

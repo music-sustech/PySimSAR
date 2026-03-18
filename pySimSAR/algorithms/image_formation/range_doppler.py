@@ -151,7 +151,7 @@ class RangeDopplerAlgorithm(ImageFormationAlgorithm):
         focused = np.fft.ifft(data_rd, axis=0)
 
         # Pixel spacings
-        range_spacing = C_LIGHT / (2.0 * phase_history.bandwidth)
+        range_spacing = C_LIGHT / (2.0 * phase_history.sample_rate)
         azimuth_spacing = V / prf
 
         return SARImage(
@@ -161,6 +161,7 @@ class RangeDopplerAlgorithm(ImageFormationAlgorithm):
             geometry="slant_range",
             algorithm=self.name,
             channel=phase_history.channel,
+            near_range=near_range,
         )
 
     def _apply_rcmc_correction(

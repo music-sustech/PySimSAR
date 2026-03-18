@@ -573,7 +573,12 @@ def _build_platform(plat_data: dict):
 
     velocity = plat_data.get("velocity", plat_data.get("velocity_mps", 100.0))
     altitude = plat_data.get("altitude", plat_data.get("altitude_m", 2000.0))
-    heading = plat_data.get("heading", plat_data.get("heading_deg", 0.0))
+    heading_raw = plat_data.get("heading", plat_data.get("heading_deg", 0.0))
+    if isinstance(heading_raw, (list, tuple)):
+        heading = np.array(heading_raw, dtype=float)
+    else:
+        # Legacy scalar — treat as degrees, convert to radians for Platform
+        heading = float(np.radians(float(heading_raw)))
     start_pos_raw = plat_data.get("start_position", plat_data.get("start_position_m"))
     start_position = np.asarray(start_pos_raw, dtype=float) if start_pos_raw is not None else None
 
@@ -831,7 +836,7 @@ def _serialize_platform(platform, output_dir: Path) -> dict:
     data = {
         "velocity_mps": platform.velocity,
         "altitude_m": platform.altitude,
-        "heading_deg": np.degrees(platform.heading) if platform.heading != 0 else 0.0,
+        "heading": platform.heading_vector.tolist(),
     }
 
     if platform.start_position is not None:

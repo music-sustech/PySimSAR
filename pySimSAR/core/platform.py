@@ -18,9 +18,15 @@ class Platform:
         Nominal platform speed in m/s. Must be > 0.
     altitude : float
         Nominal flight altitude in meters (ENU z). Must be > 0.
-    heading : float
-        Nominal heading in radians (0 = North, pi/2 = East).
-        Stored in [0, 2*pi).
+    heading : float | array-like
+        Flight direction.  Accepts either:
+
+        * A scalar (radians) — legacy convention where 0 = North (+Y)
+          and pi/2 = East (+X).  Converted internally to a 3-D unit
+          vector ``[sin(h), cos(h), 0]``.
+        * A 3-element direction vector ``[hx, hy, hz]`` which is
+          normalised internally.  Magnitude is ignored (only direction
+          matters); speed is controlled by *velocity*.
     start_position : np.ndarray | None
         Starting position in ENU meters, shape (3,).
         If None, defaults to [0, 0, altitude].
@@ -34,7 +40,7 @@ class Platform:
         self,
         velocity: float,
         altitude: float,
-        heading: float = 0.0,
+        heading: float | np.ndarray = 0.0,
         start_position: np.ndarray | None = None,
         perturbation: Any | None = None,
         sensors: list | None = None,
@@ -46,7 +52,25 @@ class Platform:
 
         self.velocity = float(velocity)
         self.altitude = float(altitude)
-        self.heading = float(heading) % (2 * np.pi)
+
+        # Accept scalar (legacy radians) or 3-D direction vector
+        h = np.asarray(heading, dtype=float)
+        if h.ndim == 0:
+            # Scalar → legacy angle convention
+            angle = float(h) % (2 * np.pi)
+            self._heading_vec = np.array(
+                [np.sin(angle), np.cos(angle), 0.0]
+            )
+            self.heading = angle  # keep for backwards compat
+        else:
+            norm = float(np.linalg.norm(h))
+            if norm < 1e-12:
+                raise ValueError("heading vector must be non-zero")
+            self._heading_vec = h / norm
+            # Derive scalar heading for backwards compat (yaw angle)
+            self.heading = float(
+                np.arctan2(self._heading_vec[0], self._heading_vec[1])
+            ) % (2 * np.pi)
 
         if start_position is not None:
             self.start_position = np.asarray(start_position, dtype=float)
@@ -56,15 +80,14 @@ class Platform:
         self.perturbation = perturbation
         self.sensors: list = sensors if sensors is not None else []
 
-    def _heading_to_velocity_vector(self) -> np.ndarray:
-        """Convert heading to ENU velocity vector.
+    @property
+    def heading_vector(self) -> np.ndarray:
+        """Unit direction vector for the flight path (read-only)."""
+        return self._heading_vec.copy()
 
-        heading=0 -> North (y+), heading=pi/2 -> East (x+).
-        """
-        vx = self.velocity * np.sin(self.heading)
-        vy = self.velocity * np.cos(self.heading)
-        vz = 0.0
-        return np.array([vx, vy, vz])
+    def _heading_to_velocity_vector(self) -> np.ndarray:
+        """Return the velocity vector (speed × heading direction)."""
+        return self.velocity * self._heading_vec
 
     def generate_ideal_trajectory(
         self, n_pulses: int, prf: float
@@ -163,9 +186,10 @@ class Platform:
         )
 
     def __repr__(self) -> str:
+        hv = self._heading_vec
         return (
             f"Platform(velocity={self.velocity}, altitude={self.altitude}, "
-            f"heading={self.heading:.3f}rad)"
+            f"heading=[{hv[0]:.3f}, {hv[1]:.3f}, {hv[2]:.3f}])"
         )
 
 

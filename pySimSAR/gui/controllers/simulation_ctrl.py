@@ -51,8 +51,13 @@ class ProjectModel:
         self.scene: Scene | None = None
         self.radar: Radar | None = None
         self.platform: Platform | None = None
-        self.n_pulses: int = 256
+        self.n_pulses: int = 512
         self.seed: int = 42
+        self.swath_range: tuple[float, float] | None = (1350.0, 1500.0)
+        self.sample_rate: float | None = None
+        self.scene_center: list[float] | None = None
+        self.n_subswaths: int = 3
+        self.burst_length: int = 20
         self.processing_config: ProcessingConfig | None = None
         self.simulation_result: SimulationResult | None = None
         self.pipeline_result: PipelineResult | None = None
@@ -93,11 +98,15 @@ class ProjectModel:
         raw: dict[str, RawData] = {}
         for ch_name, echo in sim.echo.items():
             raw[ch_name] = RawData(
-                data=echo,
+                echo=echo,
+                channel=ch_name,
                 sample_rate=sim.sample_rate,
                 carrier_freq=self.radar.carrier_freq,
                 bandwidth=self.radar.bandwidth,
                 prf=self.radar.prf,
+                waveform_name=self.radar.waveform.name,
+                sar_mode=self.radar.mode.value,
+                gate_delay=sim.gate_delay,
             )
         return raw
 
@@ -273,13 +282,22 @@ class _SimulationWorker(QObject):
             if self._cancelled:
                 return
 
-            engine = SimulationEngine(
+            engine_kwargs = dict(
                 scene=model.scene,
                 radar=model.radar,
                 n_pulses=model.n_pulses,
                 seed=model.seed,
                 platform=model.platform,
+                swath_range=model.swath_range,
             )
+            if model.sample_rate is not None:
+                engine_kwargs["sample_rate"] = model.sample_rate
+            if model.scene_center is not None:
+                engine_kwargs["scene_center"] = np.array(model.scene_center)
+            if model.radar is not None and model.radar.mode.value == "scanmar":
+                engine_kwargs["n_subswaths"] = model.n_subswaths
+                engine_kwargs["burst_length"] = model.burst_length
+            engine = SimulationEngine(**engine_kwargs)
 
             self.progress.emit(10)
             if self._cancelled:

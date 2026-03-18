@@ -5,13 +5,29 @@ from __future__ import annotations
 import numpy as np
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDoubleSpinBox,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
+
+
+def _no_scroll_unless_focused(widget: QWidget) -> None:
+    """Configure *widget* so that mouse-wheel changes its value only when focused."""
+    widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+    original_wheel = widget.wheelEvent
+
+    def _wheel(event):  # type: ignore[override]
+        if not widget.hasFocus():
+            event.ignore()
+            return
+        original_wheel(event)
+
+    widget.wheelEvent = _wheel  # type: ignore[assignment]
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
@@ -37,24 +53,45 @@ class ImageViewerPanel(QWidget):
         self._canvas = FigureCanvasQTAgg(self._figure)
         self._toolbar = NavigationToolbar2QT(self._canvas, self)
         self._im = None  # AxesImage handle
+        self._colorbar = None  # Colorbar handle
 
         # --- controls ---
         self._dynamic_range_spin = QDoubleSpinBox()
         self._dynamic_range_spin.setRange(1.0, 120.0)
         self._dynamic_range_spin.setSingleStep(1.0)
         self._dynamic_range_spin.setSuffix(" dB")
+        self._dynamic_range_spin.setDecimals(0)
         self._dynamic_range_spin.setValue(self._DEFAULT_DYNAMIC_RANGE)
         self._dynamic_range_spin.valueChanged.connect(self._refresh_display)
+        _no_scroll_unless_focused(self._dynamic_range_spin)
 
         self._cmap_combo = QComboBox()
         self._cmap_combo.addItems(list(self._COLORMAPS))
         self._cmap_combo.currentTextChanged.connect(self._refresh_display)
+        _no_scroll_unless_focused(self._cmap_combo)
+
+        self._correct_aspect = QCheckBox("Corrected aspect")
+        self._correct_aspect.setToolTip(
+            "Display with correct range/azimuth pixel spacing ratio"
+        )
+        self._correct_aspect.stateChanged.connect(self._refresh_display)
+
+        self._btn_zoom_full = QPushButton("Full Extent")
+        self._btn_zoom_full.setToolTip("Show the entire image")
+        self._btn_zoom_full.clicked.connect(self._zoom_full)
+
+        self._btn_zoom_target = QPushButton("Zoom to Target")
+        self._btn_zoom_target.setToolTip("Zoom to the region with the strongest signal")
+        self._btn_zoom_target.clicked.connect(self._zoom_to_target)
 
         controls_layout = QHBoxLayout()
         controls_layout.addWidget(QLabel("Dynamic range:"))
         controls_layout.addWidget(self._dynamic_range_spin)
         controls_layout.addWidget(QLabel("Colormap:"))
         controls_layout.addWidget(self._cmap_combo)
+        controls_layout.addWidget(self._correct_aspect)
+        controls_layout.addWidget(self._btn_zoom_full)
+        controls_layout.addWidget(self._btn_zoom_target)
         controls_layout.addStretch()
 
         # --- main layout ---
@@ -73,6 +110,7 @@ class ImageViewerPanel(QWidget):
 
         For complex-valued images the magnitude is converted to dB scale
         (20 * log10(|data|)).  Real-valued images are shown directly.
+        Automatically zooms to the target region on first display.
         """
         self._image = image
         data = image.data
@@ -85,14 +123,77 @@ class ImageViewerPanel(QWidget):
             self._db_data = data.astype(float)
 
         self._refresh_display()
+        # Auto-zoom to target region on first display
+        self._zoom_to_target()
 
     def clear(self) -> None:
         """Remove the current image and reset the canvas."""
         self._image = None
         self._db_data = None
         self._im = None
-        self._axes.clear()
+        self._colorbar = None
+        self._figure.clear()
+        self._axes = self._figure.add_subplot(111)
         self._axes.set_axis_off()
+        self._canvas.draw_idle()
+
+    # ------------------------------------------------------------------
+    # Zoom helpers
+    # ------------------------------------------------------------------
+
+    def _find_target_region(self) -> tuple[float, float, float, float] | None:
+        """Find the bounding box (in axis units) around the bright signal.
+
+        Returns (x_min, x_max, y_min, y_max) in axis coordinates, or None.
+        """
+        if self._db_data is None or self._image is None:
+            return None
+
+        db = self._db_data
+        vmax = float(np.nanmax(db))
+        threshold = vmax - self._dynamic_range_spin.value()
+
+        # Find pixels above threshold
+        mask = db > threshold
+        rows, cols = np.where(mask)
+        if len(rows) == 0:
+            return None
+
+        img = self._image
+        n_az, n_rng = db.shape
+
+        # Convert pixel indices to axis units (meters)
+        if img.pixel_spacing_range > 0 and img.pixel_spacing_azimuth > 0:
+            near_range = img.near_range if img.near_range > 0 else 0.0
+            r_min = near_range + float(cols.min()) * img.pixel_spacing_range
+            r_max = near_range + float(cols.max() + 1) * img.pixel_spacing_range
+            a_min = float(rows.min()) * img.pixel_spacing_azimuth
+            a_max = float(rows.max() + 1) * img.pixel_spacing_azimuth
+        else:
+            r_min, r_max = float(cols.min()), float(cols.max() + 1)
+            a_min, a_max = float(rows.min()), float(rows.max() + 1)
+
+        # Add 20% padding
+        r_pad = max((r_max - r_min) * 0.2, img.pixel_spacing_range * 20 if img.pixel_spacing_range > 0 else 20)
+        a_pad = max((a_max - a_min) * 0.2, img.pixel_spacing_azimuth * 20 if img.pixel_spacing_azimuth > 0 else 20)
+
+        return (r_min - r_pad, r_max + r_pad, a_min - a_pad, a_max + a_pad)
+
+    def _zoom_to_target(self) -> None:
+        """Zoom the view to the region containing the target signal."""
+        region = self._find_target_region()
+        if region is None:
+            return
+        r_min, r_max, a_min, a_max = region
+        self._axes.set_xlim(r_min, r_max)
+        self._axes.set_ylim(a_max, a_min)  # inverted for image origin=upper
+        self._canvas.draw_idle()
+
+    def _zoom_full(self) -> None:
+        """Reset zoom to show the full image extent."""
+        if self._db_data is None:
+            return
+        self._axes.autoscale()
         self._canvas.draw_idle()
 
     # ------------------------------------------------------------------
@@ -104,29 +205,87 @@ class ImageViewerPanel(QWidget):
         if self._db_data is None:
             return
 
+        # Save current zoom limits before clearing
+        try:
+            xlim = self._axes.get_xlim()
+            ylim = self._axes.get_ylim()
+            has_prior_zoom = True
+        except Exception:
+            has_prior_zoom = False
+
         vmax = float(np.nanmax(self._db_data))
         vmin = vmax - self._dynamic_range_spin.value()
         cmap = self._cmap_combo.currentText()
 
-        self._axes.clear()
+        img = self._image
+        n_az, n_rng = self._db_data.shape
+
+        # Compute axis extents in meters
+        if img is not None and img.pixel_spacing_range > 0 and img.pixel_spacing_azimuth > 0:
+            near_range = img.near_range if img.near_range > 0 else 0.0
+            range_extent = n_rng * img.pixel_spacing_range
+            azimuth_extent = n_az * img.pixel_spacing_azimuth
+            extent = [near_range, near_range + range_extent,
+                      azimuth_extent, 0]  # [left, right, bottom, top]
+        else:
+            range_extent = n_rng
+            azimuth_extent = n_az
+            extent = [0, n_rng, n_az, 0]
+
+        # Aspect ratio
+        if self._correct_aspect.isChecked() and img is not None:
+            if img.pixel_spacing_range > 0 and img.pixel_spacing_azimuth > 0:
+                aspect = img.pixel_spacing_azimuth / img.pixel_spacing_range
+            else:
+                aspect = 1.0
+        else:
+            aspect = "auto"
+
+        # Clear entire figure and recreate axes to avoid colorbar removal issues
+        self._figure.clear()
+        self._axes = self._figure.add_subplot(111)
+
         self._im = self._axes.imshow(
             self._db_data,
-            aspect="auto",
+            aspect=aspect,
             cmap=cmap,
             vmin=vmin,
             vmax=vmax,
             origin="upper",
+            extent=extent,
         )
 
+        # Colorbar
+        self._colorbar = self._figure.colorbar(
+            self._im, ax=self._axes, label="dB", fraction=0.046, pad=0.04,
+        )
+
+        # Restore prior zoom if we had one
+        if has_prior_zoom:
+            self._axes.set_xlim(xlim)
+            self._axes.set_ylim(ylim)
+
+        # Axis labels
+        if img is not None:
+            geom = img.geometry or "slant_range"
+            if geom == "ground_range":
+                self._axes.set_xlabel("Ground Range (m)")
+            else:
+                self._axes.set_xlabel("Slant Range (m)")
+            self._axes.set_ylabel("Azimuth (m)")
+        else:
+            self._axes.set_xlabel("Range (samples)")
+            self._axes.set_ylabel("Azimuth (samples)")
+
         # Title with metadata
-        if self._image is not None:
+        if img is not None:
             parts: list[str] = []
-            if self._image.algorithm:
-                parts.append(self._image.algorithm)
-            if self._image.channel:
-                parts.append(self._image.channel)
-            if self._image.geometry:
-                parts.append(self._image.geometry)
+            if img.algorithm:
+                parts.append(img.algorithm)
+            if img.channel:
+                parts.append(img.channel)
+            if img.geometry:
+                parts.append(img.geometry)
             if parts:
                 self._axes.set_title(" | ".join(parts), fontsize=9)
 

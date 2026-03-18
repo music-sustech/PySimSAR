@@ -153,4 +153,4 @@ class TestProjectModel:
         model = ProjectModel()
         model.n_pulses = 999
         model.reset()
-        assert model.n_pulses == 256
+        assert model.n_pulses == 512
