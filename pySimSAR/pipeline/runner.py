@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from pySimSAR.core.types import RawData, SARImage, SARMode
+from pySimSAR.core.types import PhaseHistoryData, RawData, SARImage, SARMode
 from pySimSAR.io.config import ProcessingConfig
 
 
@@ -26,6 +26,10 @@ class PipelineResult:
     ----------
     images : dict[str, SARImage]
         Formed images keyed by channel name.
+    phase_history : dict[str, PhaseHistoryData]
+        Range-compressed phase history per channel (intermediate result).
+    raw_data_ref : dict[str, RawData] | None
+        Reference to the raw data used for Doppler spectrum display.
     decomposition : dict[str, np.ndarray] | None
         Polarimetric decomposition results, if computed.
     steps_applied : list[str]
@@ -33,6 +37,8 @@ class PipelineResult:
     """
 
     images: dict[str, SARImage] = field(default_factory=dict)
+    phase_history: dict[str, PhaseHistoryData] = field(default_factory=dict)
+    raw_data_ref: dict[str, RawData] | None = None
     decomposition: dict[str, np.ndarray] | None = None
     steps_applied: list[str] = field(default_factory=list)
 
@@ -120,6 +126,7 @@ class PipelineRunner:
             Formed images and optional decomposition.
         """
         result = PipelineResult()
+        result.raw_data_ref = raw_data
 
         # Validate configuration against raw data
         self.validate_config(raw_data)
@@ -151,6 +158,7 @@ class PipelineRunner:
 
             for ch, rd in raw_data.items():
                 phd = if_alg.range_compress(rd, radar)
+                result.phase_history[ch] = phd
                 result.steps_applied.append(f"range_compress:{self._config.image_formation}")
 
                 def _az_compress(phase_history):

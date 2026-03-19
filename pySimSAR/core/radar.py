@@ -8,7 +8,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from pySimSAR.core.types import LookSide, PolarizationMode, SARMode
+from pySimSAR.core.types import LookSide, PolarizationMode, SARMode, SARModeConfig
 from pySimSAR.waveforms.base import Waveform
 
 # Physical constants
@@ -126,12 +126,11 @@ class Radar:
     ----------
     carrier_freq : float
         Carrier frequency in Hz (must be > 0).
-    prf : float
-        Pulse repetition frequency in Hz (must be > 0).
     transmit_power : float
         Transmit power in Watts (must be > 0).
     waveform : Waveform
-        Radar waveform (must not be None).
+        Radar waveform (must not be None). The waveform's ``prf`` attribute
+        is used as the system PRF; access it via ``radar.waveform.prf``.
     antenna : AntennaPattern
         Antenna pattern (must not be None).
     polarization : PolarizationMode | str
@@ -155,25 +154,24 @@ class Radar:
     def __init__(
         self,
         carrier_freq: float,
-        prf: float,
         transmit_power: float,
         waveform: Waveform,
         antenna: AntennaPattern,
         polarization: PolarizationMode | str,
-        mode: SARMode | str,
-        look_side: LookSide | str,
-        depression_angle: float,
+        mode: SARMode | str = SARMode.STRIPMAP,
+        look_side: LookSide | str = LookSide.RIGHT,
+        depression_angle: float = math.pi / 4,
         noise_figure: float = 3.0,
         system_losses: float = 2.0,
         reference_temp: float = 290.0,
         squint_angle: float = 0.0,
         receiver_gain_dB: float = 0.0,
+        sample_rate: float | None = None,
+        sar_mode_config: SARModeConfig | None = None,
     ) -> None:
         # Validate scalars
         if carrier_freq <= 0:
             raise ValueError(f"carrier_freq must be positive, got {carrier_freq}")
-        if prf <= 0:
-            raise ValueError(f"prf must be positive, got {prf}")
         if transmit_power <= 0:
             raise ValueError(f"transmit_power must be positive, got {transmit_power}")
         if noise_figure < 0:
@@ -184,10 +182,8 @@ class Radar:
             raise ValueError(f"reference_temp must be positive, got {reference_temp}")
         if receiver_gain_dB < 0:
             raise ValueError(f"receiver_gain_dB must be >= 0, got {receiver_gain_dB}")
-        if not 0 <= depression_angle <= math.pi / 2:
-            raise ValueError(
-                f"depression_angle must be in [0, pi/2], got {depression_angle}"
-            )
+        if sample_rate is not None and sample_rate <= 0:
+            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
         if not -math.pi / 2 <= squint_angle <= math.pi / 2:
             raise ValueError(
                 f"squint_angle must be in [-pi/2, pi/2], got {squint_angle}"
@@ -200,29 +196,64 @@ class Radar:
             raise ValueError("antenna must not be None")
 
         self.carrier_freq = carrier_freq
-        self.prf = prf
         self.transmit_power = transmit_power
         self.noise_figure = noise_figure
         self.system_losses = system_losses
         self.reference_temp = reference_temp
         self.receiver_gain = receiver_gain_dB
+        self.sample_rate = sample_rate
         self.waveform = waveform
         self.antenna = antenna
-        self.depression_angle = depression_angle
         self.squint_angle = squint_angle
 
         # Coerce string values to enums
         self.polarization = _coerce_enum(polarization, PolarizationMode)
-        self.mode = _coerce_enum(mode, SARMode)
-        self.look_side = _coerce_enum(look_side, LookSide)
+
+        # Build or accept SARModeConfig
+        if sar_mode_config is not None:
+            self._sar_mode_config = sar_mode_config
+        else:
+            _mode = _coerce_enum(mode, SARMode)
+            _look = _coerce_enum(look_side, LookSide)
+            if not 0 <= depression_angle <= math.pi / 2:
+                raise ValueError(
+                    f"depression_angle must be in [0, pi/2], got {depression_angle}"
+                )
+            self._sar_mode_config = SARModeConfig(
+                mode=_mode,
+                look_side=_look,
+                depression_angle=depression_angle,
+            )
 
         # Warn if waveform duration exceeds PRI
-        if waveform.duration(prf) > 1.0 / prf:
-            warnings.warn(
-                f"Waveform duration ({waveform.duration(prf):.6e} s) exceeds "
-                f"PRI ({1.0 / prf:.6e} s). Duty cycle may be too high.",
-                stacklevel=2,
-            )
+        if waveform.prf is not None:
+            _prf = waveform.prf
+            if waveform.duration(_prf) > 1.0 / _prf:
+                warnings.warn(
+                    f"Waveform duration ({waveform.duration(_prf):.6e} s) exceeds "
+                    f"PRI ({1.0 / _prf:.6e} s). Duty cycle may be too high.",
+                    stacklevel=2,
+                )
+
+    @property
+    def sar_mode_config(self) -> SARModeConfig:
+        """SAR imaging geometry configuration."""
+        return self._sar_mode_config
+
+    @property
+    def mode(self) -> SARMode:
+        """SAR imaging mode (delegated to sar_mode_config)."""
+        return self._sar_mode_config.mode
+
+    @property
+    def look_side(self) -> LookSide:
+        """Look direction (delegated to sar_mode_config)."""
+        return self._sar_mode_config.look_side
+
+    @property
+    def depression_angle(self) -> float:
+        """Depression angle in radians (delegated to sar_mode_config)."""
+        return self._sar_mode_config.depression_angle
 
     @property
     def bandwidth(self) -> float:
@@ -232,7 +263,7 @@ class Radar:
     @property
     def pri(self) -> float:
         """Pulse repetition interval in seconds."""
-        return 1.0 / self.prf
+        return 1.0 / self.waveform.prf
 
     @property
     def wavelength(self) -> float:

@@ -31,6 +31,9 @@ class Waveform(ABC):
     window : Callable[[int], np.ndarray] | None
         Optional window function for range compression sidelobe control.
         Signature: window(n) -> np.ndarray of shape (n,).
+    prf : float | None
+        Optional pulse repetition frequency in Hz. When set, methods like
+        ``duration()`` can be called without an explicit *prf* argument.
     """
 
     name: str = ""
@@ -41,16 +44,20 @@ class Waveform(ABC):
         duty_cycle: float,
         phase_noise: PhaseNoiseModel | None = None,
         window: Callable[[int], np.ndarray] | None = None,
+        prf: float | None = None,
     ) -> None:
         if bandwidth <= 0:
             raise ValueError(f"bandwidth must be positive, got {bandwidth}")
         if not 0 < duty_cycle <= 1:
             raise ValueError(f"duty_cycle must be in (0, 1], got {duty_cycle}")
+        if prf is not None and prf <= 0:
+            raise ValueError(f"prf must be positive, got {prf}")
 
         self._bandwidth = bandwidth
         self._duty_cycle = duty_cycle
         self._phase_noise = phase_noise
         self._window = window
+        self._prf = prf
 
     @property
     def bandwidth(self) -> float:
@@ -72,19 +79,31 @@ class Waveform(ABC):
         """Window function for range compression."""
         return self._window
 
-    def duration(self, prf: float) -> float:
+    @property
+    def prf(self) -> float | None:
+        """Pulse repetition frequency in Hz, or None if not set."""
+        return self._prf
+
+    def duration(self, prf: float | None = None) -> float:
         """Compute waveform duration from duty cycle and PRF.
 
         Parameters
         ----------
-        prf : float
-            Pulse repetition frequency in Hz.
+        prf : float | None
+            Pulse repetition frequency in Hz. If *None*, the instance-level
+            ``prf`` is used. A `ValueError` is raised when both are *None*.
 
         Returns
         -------
         float
             Waveform duration in seconds (duty_cycle / prf).
         """
+        if prf is None:
+            prf = self._prf
+        if prf is None:
+            raise ValueError(
+                "prf must be provided either as an argument or set on the waveform"
+            )
         if prf <= 0:
             raise ValueError(f"prf must be positive, got {prf}")
         return self._duty_cycle / prf

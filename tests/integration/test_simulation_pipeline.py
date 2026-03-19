@@ -34,11 +34,10 @@ def _make_radar(mode: str = "stripmap") -> Radar:
     """Create a test radar configuration."""
     from pySimSAR.waveforms.lfm import LFMWaveform
 
-    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
     antenna = _make_isotropic_antenna()
     return Radar(
         carrier_freq=9.65e9,
-        prf=1000.0,
         transmit_power=100.0,
         waveform=wf,
         antenna=antenna,
@@ -95,7 +94,7 @@ class TestPointTargetPhaseAccuracy:
 
         # Range compress the echo to find the target peak
         compressed = radar.waveform.range_compress(
-            echo[0, :], radar.prf, sample_rate
+            echo[0, :], radar.waveform.prf, sample_rate
         )
         peak_idx = np.argmax(np.abs(compressed))
 
@@ -186,10 +185,10 @@ class TestPointTargetPhaseAccuracy:
 
         # Range-compress to get clean amplitude peaks
         comp1 = radar.waveform.range_compress(
-            result1.echo["single"][0, :], radar.prf, sample_rate
+            result1.echo["single"][0, :], radar.waveform.prf, sample_rate
         )
         comp2 = radar.waveform.range_compress(
-            result2.echo["single"][0, :], radar.prf, sample_rate
+            result2.echo["single"][0, :], radar.waveform.prf, sample_rate
         )
 
         amp1 = np.max(np.abs(comp1))
@@ -227,11 +226,10 @@ class TestPointTargetPhaseAccuracy:
 
         from pySimSAR.waveforms.lfm import LFMWaveform
 
-        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
         antenna = _make_isotropic_antenna()
         radar = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=100.0,
             waveform=wf,
             antenna=antenna,
@@ -320,11 +318,10 @@ class TestQuadPolSignalCorrectness:
             PointTarget(position=[5000.0, 0.0, 0.0], rcs=scattering_matrix)
         )
 
-        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
         antenna = _make_isotropic_antenna()
         radar = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=1000.0,
             waveform=wf,
             antenna=antenna,
@@ -349,7 +346,7 @@ class TestQuadPolSignalCorrectness:
         compressed = {}
         for ch, echo in result.echo.items():
             compressed[ch] = radar.waveform.range_compress(
-                echo[0, :], radar.prf, sample_rate
+                echo[0, :], radar.waveform.prf, sample_rate
             )
         return compressed
 
@@ -475,7 +472,7 @@ def _simulate_for_pipeline(n_pulses: int = 128) -> tuple:
             sample_rate=sample_rate,
             carrier_freq=radar.carrier_freq,
             bandwidth=radar.bandwidth,
-            prf=radar.prf,
+            prf=radar.waveform.prf,
             waveform_name=radar.waveform.name,
             sar_mode="stripmap",
             gate_delay=result.gate_delay,
@@ -815,11 +812,10 @@ class TestPolarimetricValidation:
         smat = np.array([[1.0 + 0j, 0.1 + 0j], [0.1 + 0j, 0.8 + 0j]])
         scene.add_target(PointTarget(position=[5000.0, 0, 0], rcs=smat))
 
-        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
         antenna = _make_isotropic_antenna()
         radar = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=100.0,
             waveform=wf,
             antenna=antenna,
@@ -850,7 +846,7 @@ class TestPolarimetricValidation:
                 sample_rate=sample_rate,
                 carrier_freq=radar.carrier_freq,
                 bandwidth=radar.bandwidth,
-                prf=radar.prf,
+                prf=radar.waveform.prf,
                 waveform_name=radar.waveform.name,
                 sar_mode="stripmap",
                 gate_delay=result.gate_delay,

@@ -32,7 +32,7 @@ def bandwidth():
 
 @pytest.fixture()
 def waveform(bandwidth):
-    return LFMWaveform(bandwidth=bandwidth, duty_cycle=0.1)
+    return LFMWaveform(bandwidth=bandwidth, duty_cycle=0.1, prf=500.0)
 
 
 @pytest.fixture()
@@ -57,7 +57,6 @@ def scene():
 def radar(waveform, antenna):
     return Radar(
         carrier_freq=9.65e9,
-        prf=500.0,
         transmit_power=1000.0,
         waveform=waveform,
         antenna=antenna,
@@ -100,7 +99,6 @@ class TestConfigureAPI:
     def test_radar_creation(self, waveform, antenna):
         radar = Radar(
             carrier_freq=5.4e9,
-            prf=1000.0,
             transmit_power=500.0,
             waveform=waveform,
             antenna=antenna,
@@ -188,7 +186,7 @@ class TestRunPipelineAPI:
                 sample_rate=sim_result.sample_rate,
                 carrier_freq=radar.carrier_freq,
                 bandwidth=radar.bandwidth,
-                prf=radar.prf,
+                prf=radar.waveform.prf,
                 waveform_name=radar.waveform.name,
                 sar_mode="stripmap",
                 gate_delay=sim_result.gate_delay,
@@ -261,7 +259,7 @@ class TestSaveLoadAPI:
         np.testing.assert_array_equal(rd.echo, original)
         assert rd.carrier_freq == radar.carrier_freq
         assert rd.bandwidth == radar.bandwidth
-        assert rd.prf == radar.prf
+        assert rd.prf == radar.waveform.prf
 
     def test_image_round_trip(self, tmp_path):
         filepath = tmp_path / "roundtrip_img.h5"
@@ -294,7 +292,7 @@ class TestSaveLoadAPI:
             sample_rate=sim_result.sample_rate,
             carrier_freq=radar.carrier_freq,
             bandwidth=radar.bandwidth,
-            prf=radar.prf,
+            prf=radar.waveform.prf,
             waveform_name="lfm",
             sar_mode="stripmap",
         )
@@ -367,7 +365,7 @@ class TestVisualizeDataAccessAPI:
                 sample_rate=sim_result.sample_rate,
                 carrier_freq=radar.carrier_freq,
                 bandwidth=radar.bandwidth,
-                prf=radar.prf,
+                prf=radar.waveform.prf,
                 waveform_name=radar.waveform.name,
                 sar_mode="stripmap",
                 gate_delay=sim_result.gate_delay,

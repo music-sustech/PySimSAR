@@ -18,7 +18,7 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from pySimSAR.core.platform import Platform
 from pySimSAR.core.radar import Radar
 from pySimSAR.core.scene import Scene
-from pySimSAR.core.types import RawData, SARImage
+from pySimSAR.core.types import RawData, SARImage, SARModeConfig
 from pySimSAR.io.config import ProcessingConfig, SimulationConfig
 from pySimSAR.io.hdf5_format import import_data, read_hdf5, write_hdf5
 from pySimSAR.pipeline.runner import PipelineResult, PipelineRunner
@@ -55,9 +55,7 @@ class ProjectModel:
         self.seed: int = 42
         self.swath_range: tuple[float, float] | None = (1350.0, 1500.0)
         self.sample_rate: float | None = None
-        self.scene_center: list[float] | None = None
-        self.n_subswaths: int = 3
-        self.burst_length: int = 20
+        self.sar_mode_config: SARModeConfig | None = None
         self.processing_config: ProcessingConfig | None = None
         self.simulation_result: SimulationResult | None = None
         self.pipeline_result: PipelineResult | None = None
@@ -103,7 +101,7 @@ class ProjectModel:
                 sample_rate=sim.sample_rate,
                 carrier_freq=self.radar.carrier_freq,
                 bandwidth=self.radar.bandwidth,
-                prf=self.radar.prf,
+                prf=self.radar.waveform.prf,
                 waveform_name=self.radar.waveform.name,
                 sar_mode=self.radar.mode.value,
                 gate_delay=sim.gate_delay,
@@ -290,13 +288,12 @@ class _SimulationWorker(QObject):
                 platform=model.platform,
                 swath_range=model.swath_range,
             )
-            if model.sample_rate is not None:
+            if model.radar is not None and model.radar.sample_rate is not None:
+                engine_kwargs["sample_rate"] = model.radar.sample_rate
+            elif model.sample_rate is not None:
                 engine_kwargs["sample_rate"] = model.sample_rate
-            if model.scene_center is not None:
-                engine_kwargs["scene_center"] = np.array(model.scene_center)
-            if model.radar is not None and model.radar.mode.value == "scanmar":
-                engine_kwargs["n_subswaths"] = model.n_subswaths
-                engine_kwargs["burst_length"] = model.burst_length
+            if model.sar_mode_config is not None:
+                engine_kwargs["sar_mode_config"] = model.sar_mode_config
             engine = SimulationEngine(**engine_kwargs)
 
             self.progress.emit(10)

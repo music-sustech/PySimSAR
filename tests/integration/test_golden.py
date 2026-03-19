@@ -63,7 +63,7 @@ def _range_compress(result, radar):
         sample_rate=result.sample_rate,
         carrier_freq=radar.carrier_freq,
         bandwidth=radar.bandwidth,
-        prf=radar.prf,
+        prf=radar.waveform.prf,
         waveform_name=radar.waveform.name,
         sar_mode=radar.mode.value,
         gate_delay=result.gate_delay,

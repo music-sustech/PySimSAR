@@ -248,7 +248,7 @@ def build_simulation(params: dict) -> dict:
     from pySimSAR.core.radar import Radar, create_antenna_from_preset, AntennaPattern
     from pySimSAR.core.rcs_model import StaticRCS
     from pySimSAR.core.scene import DistributedTarget, PointTarget, Scene
-    from pySimSAR.core.types import SARMode
+    from pySimSAR.core.types import SARMode, SARModeConfig
     from pySimSAR.io.config import ProcessingConfig
     from pySimSAR.waveforms.lfm import LFMWaveform
     from pySimSAR.waveforms.fmcw import FMCWWaveform
@@ -318,33 +318,44 @@ def build_simulation(params: dict) -> dict:
     # --- Waveform ---
     radar_params = params.get("radar", {})
     wf_data = radar_params.get("waveform", {})
-    waveform = _build_waveform(wf_data)
+    waveform = _build_waveform(wf_data, prf=radar_params.get("prf", 1000.0))
 
     # --- Antenna ---
     ant_data = radar_params.get("antenna", {})
     antenna = _build_antenna(ant_data)
 
-    # --- Radar ---
-    mode_str = radar_params.get("mode", "stripmap")
-    # Accept "scansar" as alias for "scanmar"
-    if mode_str.lower() == "scansar":
+    # --- SARModeConfig ---
+    sarmode_data = params.get("sarmode", {})
+    mode_str = sarmode_data.get("mode", "stripmap")
+    if isinstance(mode_str, str) and mode_str.lower() == "scansar":
         mode_str = "scanmar"
 
+    sim_data = params.get("simulation", {})
+    scene_center_raw = sarmode_data.get("scene_center")
+    sar_mode_config = SARModeConfig(
+        mode=mode_str,
+        look_side=sarmode_data.get("look_side", "right"),
+        depression_angle=sarmode_data.get("depression_angle", np.radians(45.0)),
+        scene_center=(
+            np.asarray(scene_center_raw, dtype=float) if scene_center_raw is not None else None
+        ),
+        n_subswaths=int(sarmode_data.get("n_subswaths", 3)),
+        burst_length=int(sarmode_data.get("burst_length", 20)),
+    )
+
+    # --- Radar ---
     radar = Radar(
         carrier_freq=radar_params.get("carrier_freq", 9.65e9),
-        prf=radar_params.get("prf", 1000.0),
         transmit_power=radar_params.get("transmit_power", 1000.0),
         waveform=waveform,
         antenna=antenna,
         polarization=radar_params.get("polarization", "single"),
-        mode=mode_str,
-        look_side=radar_params.get("look_side", "right"),
-        depression_angle=radar_params.get("depression_angle", np.radians(45.0)),
         noise_figure=radar_params.get("noise_figure", 3.0),
         system_losses=radar_params.get("system_losses", 2.0),
         reference_temp=radar_params.get("reference_temp", 290.0),
         squint_angle=radar_params.get("squint_angle", 0.0),
         receiver_gain_dB=radar_params.get("receiver_gain", 0.0),
+        sar_mode_config=sar_mode_config,
     )
 
     # --- Platform ---
@@ -352,8 +363,6 @@ def build_simulation(params: dict) -> dict:
     platform = _build_platform(plat_data)
 
     # --- Simulation engine kwargs ---
-    sim_data = params.get("simulation", {})
-    scene_center_raw = sim_data.get("scene_center")
     swath_range_raw = sim_data.get("swath_range")
     swath_range = tuple(swath_range_raw) if swath_range_raw is not None else None
 
@@ -361,9 +370,7 @@ def build_simulation(params: dict) -> dict:
         "n_pulses": int(sim_data.get("n_pulses", 256)),
         "seed": int(sim_data.get("seed", 42)),
         "sample_rate": sim_data.get("sample_rate"),
-        "scene_center": np.asarray(scene_center_raw, dtype=float) if scene_center_raw is not None else None,
-        "n_subswaths": int(sim_data.get("n_subswaths", 3)),
-        "burst_length": int(sim_data.get("burst_length", 20)),
+        "sar_mode_config": sar_mode_config,
         "swath_range": swath_range,
     }
 
@@ -391,9 +398,6 @@ def save_parameter_set(
     n_pulses: int,
     seed: int,
     sample_rate: float | None = None,
-    scene_center: np.ndarray | None = None,
-    n_subswaths: int = 3,
-    burst_length: int = 20,
     swath_range: tuple[float, float] | None = None,
     processing_config: object | None = None,
     name: str = "",
@@ -415,6 +419,10 @@ def save_parameter_set(
     radar_data = _serialize_radar(radar, output_dir)
     _write_json(output_dir / "radar.json", radar_data)
 
+    # SAR mode
+    sarmode_data = _serialize_sarmode(radar)
+    _write_json(output_dir / "sarmode.json", sarmode_data)
+
     # Platform
     platform_data = _serialize_platform(platform, output_dir)
     _write_json(output_dir / "platform.json", platform_data)
@@ -431,14 +439,12 @@ def save_parameter_set(
         "description": description,
         "scene": {"$ref": "scene.json"},
         "radar": {"$ref": "radar.json"},
+        "sarmode": {"$ref": "sarmode.json"},
         "platform": {"$ref": "platform.json"},
         "simulation": {
             "n_pulses": n_pulses,
             "seed": seed,
             "sample_rate_hz": sample_rate,
-            "scene_center_m": scene_center.tolist() if scene_center is not None else None,
-            "n_subswaths": n_subswaths,
-            "burst_length": burst_length,
             "swath_range_m": list(swath_range) if swath_range is not None else None,
         },
     }
@@ -501,7 +507,7 @@ def _parse_rcs_model(model_data):
     raise ValueError(f"Unknown RCS model type: {model_type!r}")
 
 
-def _build_waveform(wf_data: dict):
+def _build_waveform(wf_data: dict, prf: float | None = None):
     """Build a Waveform from parameter dict."""
     from pySimSAR.waveforms.lfm import LFMWaveform
     from pySimSAR.waveforms.fmcw import FMCWWaveform
@@ -525,12 +531,13 @@ def _build_waveform(wf_data: dict):
 
     if wf_type == "lfm":
         return LFMWaveform(bandwidth=bandwidth, duty_cycle=duty_cycle,
-                           window=window, phase_noise=phase_noise)
+                           window=window, phase_noise=phase_noise, prf=prf)
     elif wf_type == "fmcw":
         from pySimSAR.core.types import RampType
         ramp = wf_data.get("ramp_type", "up")
         return FMCWWaveform(bandwidth=bandwidth, duty_cycle=duty_cycle,
-                            ramp_type=ramp, window=window, phase_noise=phase_noise)
+                            ramp_type=ramp, window=window, phase_noise=phase_noise,
+                            prf=prf)
     else:
         raise ValueError(f"Unknown waveform type: {wf_type!r}")
 
@@ -812,19 +819,29 @@ def _serialize_radar(radar, output_dir: Path) -> dict:
 
     return {
         "carrier_freq_hz": radar.carrier_freq,
-        "prf_hz": radar.prf,
+        "prf_hz": radar.waveform.prf,
         "transmit_power_w": radar.transmit_power,
         "receiver_gain_dB": radar.receiver_gain,
         "noise_figure_dB": radar.noise_figure,
         "system_losses_dB": radar.system_losses,
         "reference_temp_K": radar.reference_temp,
         "polarization": radar.polarization.value,
-        "mode": radar.mode.value,
-        "look_side": radar.look_side.value,
-        "depression_angle_deg": np.degrees(radar.depression_angle),
         "squint_angle_deg": np.degrees(radar.squint_angle),
         "waveform": {"$ref": "waveform.json"},
         "antenna": {"$ref": "antenna.json"},
+    }
+
+
+def _serialize_sarmode(radar) -> dict:
+    """Serialize SAR imaging mode config to JSON dict."""
+    cfg = radar.sar_mode_config
+    return {
+        "mode": cfg.mode.value,
+        "look_side": cfg.look_side.value,
+        "depression_angle_deg": np.degrees(cfg.depression_angle),
+        "scene_center_m": cfg.scene_center.tolist() if cfg.scene_center is not None else None,
+        "n_subswaths": cfg.n_subswaths,
+        "burst_length": cfg.burst_length,
     }
 
 
@@ -896,9 +913,161 @@ def _serialize_processing_config(pc) -> dict:
     return data
 
 
+def _default_project_dir() -> Path:
+    """Return the path to the shipped default project."""
+    return Path(__file__).resolve().parent.parent / "presets" / "projects" / "default_stripmap"
+
+
+def project_to_gui_params(params: dict) -> dict:
+    """Convert a resolved project parameter dict to GUI tree format.
+
+    The GUI tree's ``set_all_parameters`` expects a dict with keys:
+    simulation, sarmode, radar, antenna, waveform, platform, scene,
+    processing_config.
+
+    Parameters
+    ----------
+    params : dict
+        Resolved parameter dictionary from ``load_parameter_set()``.
+
+    Returns
+    -------
+    dict
+        Parameter dict suitable for ``ParameterTreeWidget.set_all_parameters()``.
+    """
+    radar_data = params.get("radar", {})
+    sarmode_data = params.get("sarmode", {})
+    sim_data = params.get("simulation", {})
+    plat_data = params.get("platform", {})
+    scene_data = params.get("scene", {})
+    proc_data = params.get("processing", {})
+
+    # --- sarmode (imaging geometry) ---
+    sarmode = {
+        "mode": sarmode_data.get("mode", "stripmap"),
+        "look_side": sarmode_data.get("look_side", "right"),
+        "depression_angle": sarmode_data.get("depression_angle", np.radians(45.0)),
+        "scene_center": sarmode_data.get("scene_center", [0, 0, 0]),
+        "n_subswaths": sarmode_data.get("n_subswaths", 3),
+        "burst_length": sarmode_data.get("burst_length", 20),
+    }
+
+    # --- simulation ---
+    swath_raw = sim_data.get("swath_range")
+    simulation = {
+        "seed": sim_data.get("seed", 42),
+        "swath_range": tuple(swath_raw) if swath_raw is not None else (1350.0, 1500.0),
+        "sample_rate": sim_data.get("sample_rate"),
+    }
+
+    # --- radar (hardware only, no mode/look/depression) ---
+    wf_data = radar_data.get("waveform", {})
+    ant_data = radar_data.get("antenna", {})
+
+    radar = {
+        "carrier_freq": radar_data.get("carrier_freq", 9.65e9),
+        "transmit_power": radar_data.get("transmit_power", 1000.0),
+        "receiver_gain_dB": radar_data.get("receiver_gain", 0.0),
+        "system_losses": radar_data.get("system_losses", 2.0),
+        "noise_figure": radar_data.get("noise_figure", 3.0),
+        "squint_angle": radar_data.get("squint_angle", 0.0),
+        "reference_temp": radar_data.get("reference_temp", 290.0),
+        "polarization": radar_data.get("polarization", "single"),
+    }
+
+    antenna = {
+        "preset": ant_data.get("preset", "flat"),
+        "az_beamwidth": ant_data.get("az_beamwidth", np.radians(10.0)),
+        "el_beamwidth": ant_data.get("el_beamwidth", np.radians(10.0)),
+        "peak_gain_dB": ant_data.get("peak_gain", 30.0),
+    }
+
+    waveform = {
+        "waveform_type": (wf_data.get("type", "lfm")).upper(),
+        "prf": wf_data.get("prf", radar_data.get("prf", 1000.0)),
+        "bandwidth": wf_data.get("bandwidth", 100e6),
+        "duty_cycle": wf_data.get("duty_cycle", 0.01),
+        "window": wf_data.get("window"),
+        "phase_noise": wf_data.get("phase_noise"),
+    }
+
+    # --- platform ---
+    heading_raw = plat_data.get("heading", [0, 1, 0])
+    platform = {
+        "velocity": plat_data.get("velocity", 100.0),
+        "altitude": plat_data.get("altitude", 1000.0),
+        "heading": heading_raw if isinstance(heading_raw, list) else [0, 1, 0],
+        "start_position": plat_data.get("start_position", [0, -25, 1000]),
+        "flight_path_mode": plat_data.get("flight_path_mode", "heading_time"),
+        "flight_time": plat_data.get("flight_time", 0.5),
+        "perturbation": plat_data.get("perturbation"),
+        "gps": plat_data.get("gps"),
+        "imu": plat_data.get("imu"),
+    }
+
+    # --- scene ---
+    targets = []
+    for pt in scene_data.get("point_targets", []):
+        pos = pt.get("position", pt.get("position_m", [0, 0, 0]))
+        rcs = pt.get("rcs", pt.get("rcs_m2", 1.0))
+        vel = pt.get("velocity", pt.get("velocity_mps"))
+        entry = {"position": list(pos), "rcs": float(rcs)}
+        if vel is not None:
+            entry["velocity"] = list(vel)
+        targets.append(entry)
+
+    scene = {
+        "origin_lat": scene_data.get("origin_lat", scene_data.get("origin_lat_deg", 0.0)),
+        "origin_lon": scene_data.get("origin_lon", scene_data.get("origin_lon_deg", 0.0)),
+        "origin_alt": scene_data.get("origin_alt", 0.0),
+        "targets": targets,
+        "distributed_targets": scene_data.get("distributed_targets", []),
+    }
+
+    # --- processing_config ---
+    processing_config = {}
+    for step in ("image_formation", "moco", "autofocus", "geocoding", "polarimetric_decomposition"):
+        step_data = proc_data.get(step)
+        if step_data is None:
+            processing_config[step] = None
+        elif isinstance(step_data, str):
+            processing_config[step] = step_data
+        elif isinstance(step_data, dict):
+            processing_config[step] = step_data.get("algorithm")
+            step_params = step_data.get("params", {})
+            if step_params:
+                processing_config[f"{step}_params"] = step_params
+
+    return {
+        "simulation": simulation,
+        "sarmode": sarmode,
+        "radar": radar,
+        "antenna": antenna,
+        "waveform": waveform,
+        "platform": platform,
+        "scene": scene,
+        "processing_config": processing_config,
+    }
+
+
+def load_default_gui_params() -> dict:
+    """Load the shipped default project and return GUI-ready parameter dict.
+
+    Returns
+    -------
+    dict
+        Parameter dict for ``ParameterTreeWidget.set_all_parameters()``.
+    """
+    project_dir = _default_project_dir()
+    params = load_parameter_set(project_dir)
+    return project_to_gui_params(params)
+
+
 __all__ = [
     "resolve_refs",
     "load_parameter_set",
     "build_simulation",
     "save_parameter_set",
+    "project_to_gui_params",
+    "load_default_gui_params",
 ]

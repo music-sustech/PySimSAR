@@ -63,10 +63,10 @@ def main():
         scene.add_target(PointTarget(position=t["pos"], rcs=t["rcs"]))
 
     # --- Radar ---
-    wf = LFMWaveform(bandwidth=100e6, duty_cycle=0.1)
+    wf = LFMWaveform(bandwidth=100e6, duty_cycle=0.1, prf=2000.0)
     antenna = make_antenna(peak_gain_dB=30.0)
     radar = Radar(
-        carrier_freq=9.65e9, prf=2000.0, transmit_power=10000.0,
+        carrier_freq=9.65e9, transmit_power=10000.0,
         waveform=wf, antenna=antenna, polarization="single",
         mode="stripmap", look_side="right", depression_angle=0.5,
         noise_figure=1.0,
@@ -89,7 +89,7 @@ def main():
     print(f"  Echo: {echo.shape[0]} pulses x {echo.shape[1]} range samples")
 
     print("Range compressing...")
-    compressed = radar.waveform.range_compress(echo, radar.prf, sample_rate)
+    compressed = radar.waveform.range_compress(echo, radar.waveform.prf, sample_rate)
 
     # --- Axes ---
     range_m = np.arange(echo.shape[1]) * C_LIGHT / (2.0 * sample_rate)

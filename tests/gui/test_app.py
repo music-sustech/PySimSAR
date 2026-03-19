@@ -41,51 +41,52 @@ class TestMainWindowSmoke:
         window.close()
 
     def test_main_window_has_panels(self, qapp, qtbot):
-        """MainWindow contains all 4 visualization panels."""
+        """MainWindow contains all 9 visualization panels."""
         from pySimSAR.gui.app import MainWindow
 
         window = MainWindow()
         qtbot.addWidget(window)
 
-        assert window._tab_widget.count() == 4
+        assert window._tab_widget.count() == 9
         assert window._tab_widget.tabText(0) == "3D Scene"
         assert window._tab_widget.tabText(1) == "Trajectory"
         assert window._tab_widget.tabText(2) == "Beam Animation"
         assert window._tab_widget.tabText(3) == "SAR Image"
+        assert window._tab_widget.tabText(4) == "Phase History"
+        assert window._tab_widget.tabText(5) == "Range Profile"
+        assert window._tab_widget.tabText(6) == "Azimuth Profile"
+        assert window._tab_widget.tabText(7) == "Doppler Spectrum"
+        assert window._tab_widget.tabText(8) == "Polarimetry"
         window.close()
 
-    def test_main_window_has_editors(self, qapp, qtbot):
-        """MainWindow contains all parameter editors."""
+    def test_main_window_has_param_tree(self, qapp, qtbot):
+        """MainWindow contains the parameter tree and calc panel."""
         from pySimSAR.gui.app import MainWindow
 
         window = MainWindow()
         qtbot.addWidget(window)
 
-        assert window._sim_editor is not None
-        assert window._radar_editor is not None
-        assert window._waveform_editor is not None
-        assert window._platform_editor is not None
-        assert window._scene_editor is not None
-        assert window._algorithm_selector is not None
+        assert window._param_tree is not None
+        assert window._calc_panel is not None
+        # Verify parameter tree returns valid data
+        params = window._param_tree.get_all_parameters()
+        assert "radar" in params
+        assert "platform" in params
+        assert "scene" in params
         window.close()
 
-    def test_new_project_resets(self, qapp, qtbot):
-        """File > New Project resets all editors."""
+    def test_main_window_has_menus(self, qapp, qtbot):
+        """MainWindow has File, Edit, Tools, Simulation menus."""
         from pySimSAR.gui.app import MainWindow
 
         window = MainWindow()
         qtbot.addWidget(window)
 
-        # Change a parameter
-        window._sim_editor.set_params({"n_pulses": 999, "seed": 123})
-        assert window._sim_editor.get_params()["n_pulses"] == 999
-
-        # Reset
-        window._on_new_project()
-
-        # Should be back to defaults
-        params = window._sim_editor.get_params()
-        assert params["n_pulses"] != 999
+        menus = [a.text() for a in window.menuBar().actions()]
+        assert "&File" in menus
+        assert "&Edit" in menus
+        assert "&Tools" in menus
+        assert "&Simulation" in menus
         window.close()
 
 

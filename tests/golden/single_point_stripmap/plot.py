@@ -57,14 +57,14 @@ def main():
     # Gate delay for converting bins to range
     gate_near_range = result.gate_delay * C_LIGHT / 2.0
     range_bin_spacing = C_LIGHT / (2.0 * result.sample_rate)
-    az_spacing = np.linalg.norm(result.velocities[0]) / radar.prf
+    az_spacing = np.linalg.norm(result.velocities[0]) / radar.waveform.prf
 
     # --- Plot 1: Range-Compressed Range-Time Diagram ---
     print("Generating Plot 1: Range-Time Diagram (range-compressed)...")
     # Range compress all pulses for the range-time display
     rc_all = np.zeros_like(echo)
     for i in range(echo.shape[0]):
-        rc_all[i, :] = radar.waveform.range_compress(echo[i], radar.prf, result.sample_rate)
+        rc_all[i, :] = radar.waveform.range_compress(echo[i], radar.waveform.prf, result.sample_rate)
     rc_all_dB = 20 * np.log10(np.abs(rc_all) + 1e-30)
     vmax = np.max(rc_all_dB)
 
@@ -94,7 +94,7 @@ def main():
 
     # --- Plot 2: Range-Compressed Broadside Pulse ---
     print("Generating Plot 2: Range-Compressed Broadside Pulse...")
-    rc_pulse = radar.waveform.range_compress(echo[broadside_idx], radar.prf, result.sample_rate)
+    rc_pulse = radar.waveform.range_compress(echo[broadside_idx], radar.waveform.prf, result.sample_rate)
     rc_mag_dB = 20 * np.log10(np.abs(rc_pulse) + 1e-30)
     rc_peak = np.max(rc_mag_dB)
     rc_peak_bin = np.argmax(np.abs(rc_pulse))
@@ -126,7 +126,7 @@ def main():
     raw = RawData(
         echo=echo, channel="single", sample_rate=result.sample_rate,
         carrier_freq=radar.carrier_freq, bandwidth=radar.bandwidth,
-        prf=radar.prf, waveform_name=radar.waveform.name,
+        prf=radar.waveform.prf, waveform_name=radar.waveform.name,
         sar_mode=radar.mode.value, gate_delay=result.gate_delay,
     )
     trajectory = Trajectory(

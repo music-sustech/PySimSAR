@@ -31,6 +31,46 @@ class LookSide(str, Enum):
     RIGHT = "right"
 
 
+@dataclass
+class SARModeConfig:
+    """Imaging geometry configuration for SAR modes.
+
+    Bundles the parameters that describe *how* a SAR system images
+    (mode, look direction, depression angle, beam pointing, scan pattern)
+    as opposed to *what hardware* it uses (carrier frequency, power, etc.).
+
+    Parameters
+    ----------
+    mode : SARMode | str
+        SAR imaging mode (stripmap, spotlight, scanmar).
+    look_side : LookSide | str
+        Antenna look direction relative to flight track.
+    depression_angle : float
+        Depression angle in radians, range [0, pi/2].
+    scene_center : np.ndarray | None
+        Scene center for spotlight/scansar beam pointing, shape (3,).
+    n_subswaths : int
+        Number of sub-swaths (scansar mode).
+    burst_length : int
+        Pulses per burst (scansar mode).
+    """
+
+    mode: SARMode | str = SARMode.STRIPMAP
+    look_side: LookSide | str = LookSide.RIGHT
+    depression_angle: float = 0.7854  # pi/4 radians (45 deg)
+    scene_center: np.ndarray | None = None
+    n_subswaths: int = 3
+    burst_length: int = 20
+
+    def __post_init__(self) -> None:
+        if isinstance(self.mode, str):
+            self.mode = SARMode(self.mode.lower())
+        if isinstance(self.look_side, str):
+            self.look_side = LookSide(self.look_side.lower())
+        if self.scene_center is not None:
+            self.scene_center = np.asarray(self.scene_center, dtype=float)
+
+
 class RampType(str, Enum):
     """FMCW frequency ramp direction."""
 

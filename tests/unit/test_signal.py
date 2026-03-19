@@ -33,11 +33,10 @@ def _make_antenna() -> AntennaPattern:
 @pytest.fixture
 def radar():
     """Simple X-band radar for signal tests."""
-    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
     antenna = _make_antenna()
     return Radar(
         carrier_freq=9.65e9,
-        prf=1000.0,
         transmit_power=100.0,
         waveform=wf,
         antenna=antenna,
@@ -135,19 +134,19 @@ class TestEchoPhaseAccuracy:
         """Waveform sample count matches duration * sample_rate."""
         sample_rate = 300e6
         wf = radar.waveform
-        signal = wf.generate(radar.prf, sample_rate)
-        expected_n = int(wf.duration(radar.prf) * sample_rate)
+        signal = wf.generate(radar.waveform.prf, sample_rate)
+        expected_n = int(wf.duration(radar.waveform.prf) * sample_rate)
         assert len(signal) == expected_n
 
     def test_matched_filter_peak_at_zero_delay(self, radar):
         """Range compression of chirp echo peaks at correct sample."""
         sample_rate = 300e6
         wf = radar.waveform
-        tx = wf.generate(radar.prf, sample_rate)
+        tx = wf.generate(radar.waveform.prf, sample_rate)
 
         # Create an echo that's the transmit signal (zero delay)
         echo = tx.copy()
-        compressed = wf.range_compress(echo, radar.prf, sample_rate)
+        compressed = wf.range_compress(echo, radar.waveform.prf, sample_rate)
 
         # Peak should be at index 0 (zero delay)
         peak_idx = np.argmax(np.abs(compressed))
@@ -184,11 +183,10 @@ class TestMemoryEstimation:
         from pySimSAR.core.scene import Scene
         from pySimSAR.simulation.engine import SimulationEngine
 
-        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
         antenna = _make_antenna()
         quad_radar = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=100.0,
             waveform=wf,
             antenna=antenna,
@@ -220,11 +218,10 @@ class TestMemoryEstimation:
         from pySimSAR.core.scene import Scene
         from pySimSAR.simulation.engine import SimulationEngine
 
-        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
         antenna = _make_antenna()
         r = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=100.0,
             waveform=wf,
             antenna=antenna,

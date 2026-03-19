@@ -47,7 +47,7 @@ def make_raw(echo, result, radar):
     return RawData(
         echo=echo, channel="single", sample_rate=result.sample_rate,
         carrier_freq=radar.carrier_freq, bandwidth=radar.bandwidth,
-        prf=radar.prf, waveform_name=radar.waveform.name,
+        prf=radar.waveform.prf, waveform_name=radar.waveform.name,
         sar_mode=radar.mode.value, gate_delay=result.gate_delay,
     )
 
@@ -81,7 +81,7 @@ def main():
     # Axis conversions
     gate_near_range = result.gate_delay * C_LIGHT / 2.0
     range_bin_spacing = C_LIGHT / (2.0 * result.sample_rate)
-    az_spacing = np.linalg.norm(result.velocities[0]) / radar.prf
+    az_spacing = np.linalg.norm(result.velocities[0]) / radar.waveform.prf
     t = result.pulse_times
 
     # Ground truth

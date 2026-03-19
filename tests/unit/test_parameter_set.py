@@ -50,14 +50,22 @@ def tmp_project(tmp_path):
         "system_losses_dB": 2.0,
         "reference_temp_K": 290.0,
         "polarization": "single",
-        "mode": "stripmap",
-        "look_side": "right",
-        "depression_angle_deg": 45.0,
         "squint_angle_deg": 0.0,
         "waveform": {"$ref": "waveform.json"},
         "antenna": {"$ref": "antenna.json"},
     }
     _write(tmp_path / "radar.json", radar)
+
+    # SAR mode
+    sarmode = {
+        "mode": "stripmap",
+        "look_side": "right",
+        "depression_angle_deg": 45.0,
+        "scene_center_m": None,
+        "n_subswaths": 3,
+        "burst_length": 20,
+    }
+    _write(tmp_path / "sarmode.json", sarmode)
 
     # Scene
     scene = {
@@ -93,12 +101,12 @@ def tmp_project(tmp_path):
         "description": "Unit test project",
         "scene": {"$ref": "scene.json"},
         "radar": {"$ref": "radar.json"},
+        "sarmode": {"$ref": "sarmode.json"},
         "platform": {"$ref": "platform.json"},
         "simulation": {
             "n_pulses": 256,
             "seed": 42,
             "sample_rate_hz": None,
-            "scene_center_m": None,
         },
     }
     _write(tmp_path / "project.json", project)
@@ -227,10 +235,10 @@ class TestLoadParameterSet:
     def test_degree_to_radian_conversion(self, tmp_project):
         """_deg keys converted to radians (except geographic)."""
         params = load_parameter_set(tmp_project)
-        radar = params["radar"]
+        sarmode = params["sarmode"]
         # depression_angle should be in radians
-        assert "depression_angle" in radar
-        assert radar["depression_angle"] == pytest.approx(np.radians(45.0))
+        assert "depression_angle" in sarmode
+        assert sarmode["depression_angle"] == pytest.approx(np.radians(45.0))
 
     def test_geographic_coords_not_converted(self, tmp_project):
         """origin_lat_deg and origin_lon_deg stay in degrees."""
@@ -296,9 +304,9 @@ class TestBuildSimulation:
 
     def test_scansar_alias(self, tmp_project):
         """'scansar' is accepted as alias for 'scanmar'."""
-        radar_json = json.loads((tmp_project / "radar.json").read_text())
-        radar_json["mode"] = "scansar"
-        _write(tmp_project / "radar.json", radar_json)
+        sarmode_json = json.loads((tmp_project / "sarmode.json").read_text())
+        sarmode_json["mode"] = "scansar"
+        _write(tmp_project / "sarmode.json", sarmode_json)
         params = load_parameter_set(tmp_project)
         sim = build_simulation(params)
         from pySimSAR.core.types import SARMode
@@ -366,10 +374,10 @@ class TestSaveParameterSet:
         for i in range(25):
             scene.add_target(PointTarget(position=[i * 10, 0, 0], rcs=1.0))
 
-        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+        wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
         ant = create_antenna_from_preset("flat", np.radians(3.0), np.radians(10.0), 30.0)
         radar = Radar(
-            carrier_freq=9.65e9, prf=1000.0, transmit_power=1000.0,
+            carrier_freq=9.65e9, transmit_power=1000.0,
             waveform=wf, antenna=ant, polarization="single",
             mode="stripmap", look_side="right", depression_angle=np.radians(45.0),
         )

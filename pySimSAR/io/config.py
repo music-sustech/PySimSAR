@@ -227,7 +227,7 @@ class SimulationConfig:
             "state": self._state.value,
             "radar": {
                 "carrier_freq": self._radar.carrier_freq,
-                "prf": self._radar.prf,
+                "prf": self._radar.waveform.prf,
                 "bandwidth": self._radar.bandwidth,
                 "waveform": self._radar.waveform.name,
                 "sar_mode": self._radar.mode.value,

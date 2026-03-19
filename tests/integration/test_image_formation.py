@@ -37,11 +37,10 @@ def _make_radar(mode: str = "stripmap") -> Radar:
     """Create a test radar with LFM waveform."""
     from pySimSAR.waveforms.lfm import LFMWaveform
 
-    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
     antenna = _make_isotropic_antenna()
     return Radar(
         carrier_freq=9.65e9,
-        prf=1000.0,
         transmit_power=100.0,
         waveform=wf,
         antenna=antenna,
@@ -95,7 +94,7 @@ def _simulate_point_target(
         sample_rate=sample_rate,
         carrier_freq=radar.carrier_freq,
         bandwidth=radar.bandwidth,
-        prf=radar.prf,
+        prf=radar.waveform.prf,
         waveform_name=radar.waveform.name,
         sar_mode="stripmap",
         gate_delay=result.gate_delay,
@@ -270,7 +269,7 @@ class TestRangeDopplerAlgorithm:
             sample_rate=sample_rate,
             carrier_freq=radar.carrier_freq,
             bandwidth=radar.bandwidth,
-            prf=radar.prf,
+            prf=radar.waveform.prf,
             gate_delay=result.gate_delay,
         )
         trajectory = Trajectory(
@@ -364,7 +363,7 @@ class TestTwoStepInterface:
         assert isinstance(phd, PhaseHistoryData)
         assert phd.data.shape == raw_data.echo.shape
         assert phd.sample_rate == raw_data.sample_rate
-        assert phd.prf == radar.prf
+        assert phd.prf == radar.waveform.prf
         assert phd.carrier_freq == radar.carrier_freq
         assert phd.bandwidth == radar.bandwidth
         assert phd.channel == raw_data.channel

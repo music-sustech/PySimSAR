@@ -71,17 +71,17 @@ class RangeDopplerAlgorithm(ImageFormationAlgorithm):
         echo = raw_data.echo  # (n_azimuth, n_range)
 
         # Ensure waveform has generated its reference signal
-        radar.waveform.generate(radar.prf, raw_data.sample_rate)
+        radar.waveform.generate(radar.waveform.prf, raw_data.sample_rate)
 
         # Apply waveform range compression (handles 2D: axis=1)
         compressed = radar.waveform.range_compress(
-            echo, radar.prf, raw_data.sample_rate
+            echo, radar.waveform.prf, raw_data.sample_rate
         )
 
         return PhaseHistoryData(
             data=compressed,
             sample_rate=raw_data.sample_rate,
-            prf=radar.prf,
+            prf=radar.waveform.prf,
             carrier_freq=radar.carrier_freq,
             bandwidth=radar.bandwidth,
             channel=raw_data.channel,

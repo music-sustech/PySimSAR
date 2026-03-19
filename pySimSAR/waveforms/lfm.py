@@ -39,6 +39,7 @@ class LFMWaveform(Waveform):
         duty_cycle: float = 0.1,
         phase_noise=None,
         window=None,
+        prf: float | None = None,
     ) -> None:
         if duty_cycle >= 1.0:
             raise ValueError(
@@ -49,6 +50,7 @@ class LFMWaveform(Waveform):
             duty_cycle=duty_cycle,
             phase_noise=phase_noise,
             window=window,
+            prf=prf,
         )
         self._tx_signal: np.ndarray | None = None
 

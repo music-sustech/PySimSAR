@@ -84,6 +84,19 @@ class ImageViewerPanel(QWidget):
         self._btn_zoom_target.setToolTip("Zoom to the region with the strongest signal")
         self._btn_zoom_target.clicked.connect(self._zoom_to_target)
 
+        self._btn_find_peak = QPushButton("Find Peak")
+        self._btn_find_peak.setCheckable(True)
+        self._btn_find_peak.setToolTip("Click/drag on image to find peak value in region")
+        self._btn_find_peak.toggled.connect(self._on_find_peak_toggled)
+
+        self._btn_clear_peaks = QPushButton("Clear Peaks")
+        self._btn_clear_peaks.setToolTip("Remove all peak markers")
+        self._btn_clear_peaks.clicked.connect(self._on_clear_peaks)
+
+        # Peak finder tool
+        from pySimSAR.gui.widgets.peak_tool import PeakFinder
+        self._peak_finder = PeakFinder(self._axes)
+
         controls_layout = QHBoxLayout()
         controls_layout.addWidget(QLabel("Dynamic range:"))
         controls_layout.addWidget(self._dynamic_range_spin)
@@ -92,6 +105,8 @@ class ImageViewerPanel(QWidget):
         controls_layout.addWidget(self._correct_aspect)
         controls_layout.addWidget(self._btn_zoom_full)
         controls_layout.addWidget(self._btn_zoom_target)
+        controls_layout.addWidget(self._btn_find_peak)
+        controls_layout.addWidget(self._btn_clear_peaks)
         controls_layout.addStretch()
 
         # --- main layout ---
@@ -289,4 +304,23 @@ class ImageViewerPanel(QWidget):
             if parts:
                 self._axes.set_title(" | ".join(parts), fontsize=9)
 
+        self._canvas.draw_idle()
+
+    # ------------------------------------------------------------------
+    # Peak finder tool
+    # ------------------------------------------------------------------
+
+    def _on_find_peak_toggled(self, checked: bool) -> None:
+        """Activate or deactivate the peak finder tool."""
+        if checked:
+            self._peak_finder.ax = self._axes
+            if self._db_data is not None:
+                self._peak_finder.set_image_data(self._db_data)
+            self._peak_finder.activate(self._canvas)
+        else:
+            self._peak_finder.deactivate()
+
+    def _on_clear_peaks(self) -> None:
+        """Remove all peak markers."""
+        self._peak_finder.clear_all_markers()
         self._canvas.draw_idle()

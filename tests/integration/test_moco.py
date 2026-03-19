@@ -47,11 +47,10 @@ def _make_radar() -> Radar:
     """Create a test radar with LFM waveform."""
     from pySimSAR.waveforms.lfm import LFMWaveform
 
-    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
     antenna = _make_isotropic_antenna()
     return Radar(
         carrier_freq=9.65e9,
-        prf=1000.0,
         transmit_power=100.0,
         waveform=wf,
         antenna=antenna,
@@ -95,7 +94,7 @@ def _simulate_ideal(
         sample_rate=sample_rate,
         carrier_freq=radar.carrier_freq,
         bandwidth=radar.bandwidth,
-        prf=radar.prf,
+        prf=radar.waveform.prf,
         waveform_name=radar.waveform.name,
         sar_mode="stripmap",
         gate_delay=result.gate_delay,
@@ -222,7 +221,7 @@ class TestFirstOrderMoCo:
         raw_data, traj, radar = _simulate_ideal(n_pulses=n_pulses)
 
         # Sinusoidal cross-track oscillation
-        t = np.arange(n_pulses) / radar.prf
+        t = np.arange(n_pulses) / radar.waveform.prf
         offsets = np.zeros((n_pulses, 3))
         offsets[:, 0] = 0.3 * np.sin(2 * np.pi * 5.0 * t)
 
@@ -287,7 +286,7 @@ class TestFirstOrderMoCo:
         raw_data, traj, radar = _simulate_ideal(n_pulses=n_pulses)
 
         # Inject cross-track oscillation
-        t = np.arange(n_pulses) / radar.prf
+        t = np.arange(n_pulses) / radar.waveform.prf
         offsets = np.zeros((n_pulses, 3))
         offsets[:, 0] = 0.5 * np.sin(2 * np.pi * 3.0 * t)
 
@@ -358,7 +357,7 @@ class TestSecondOrderMoCo:
         raw_data, traj, radar = _simulate_ideal(n_pulses=n_pulses)
 
         # Cross-track + vertical oscillation
-        t = np.arange(n_pulses) / radar.prf
+        t = np.arange(n_pulses) / radar.waveform.prf
         offsets = np.zeros((n_pulses, 3))
         offsets[:, 0] = 0.3 * np.sin(2 * np.pi * 5.0 * t)
         offsets[:, 2] = 0.2 * np.cos(2 * np.pi * 3.0 * t)
@@ -398,7 +397,7 @@ class TestSecondOrderMoCo:
         n_pulses = 256
         raw_data, traj, radar = _simulate_ideal(n_pulses=n_pulses)
 
-        t = np.arange(n_pulses) / radar.prf
+        t = np.arange(n_pulses) / radar.waveform.prf
         offsets = np.zeros((n_pulses, 3))
         offsets[:, 0] = 0.5 * np.sin(2 * np.pi * 3.0 * t)
         offsets[:, 2] = 0.3 * np.cos(2 * np.pi * 2.0 * t)

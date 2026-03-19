@@ -5,14 +5,12 @@
   "scene": { "$ref": "scene.json" },
   "radar": { "$ref": "radar.json" },
   "platform": { "$ref": "platform.json" },
+  "sarmode": { "$ref": "sarmode.json" },
   "simulation": {
     "n_pulses": 512,
     "seed": 42,
     "sample_rate_hz": null,
-    "scene_center_m": null,
-    "swath_range_m": [2600, 3100],
-    "n_subswaths": 3,
-    "burst_length": 20
+    "swath_range_m": [2600, 3100]
   },
   "processing": {
     "image_formation": { "algorithm": "range_doppler", "params": {} },

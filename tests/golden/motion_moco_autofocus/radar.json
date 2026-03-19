@@ -7,9 +7,6 @@
   "system_losses_dB": 2.0,
   "reference_temp_K": 290.0,
   "polarization": "single",
-  "mode": "stripmap",
-  "look_side": "right",
-  "depression_angle_deg": 45.0,
   "squint_angle_deg": 0.0,
   "waveform": { "$ref": "waveform.json" },
   "antenna": { "$ref": "antenna.json" }

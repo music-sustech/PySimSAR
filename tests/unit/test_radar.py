@@ -73,7 +73,7 @@ def callable_pattern():
 @pytest.fixture()
 def mock_waveform():
     """Create a mock waveform with reasonable defaults."""
-    return MockWaveform(bandwidth=50e6, duty_cycle=0.1)
+    return MockWaveform(bandwidth=50e6, duty_cycle=0.1, prf=1000.0)
 
 
 @pytest.fixture()
@@ -81,7 +81,6 @@ def basic_radar(mock_waveform, array_pattern):
     """Create a basic Radar instance."""
     return Radar(
         carrier_freq=9.65e9,
-        prf=1000.0,
         transmit_power=500.0,
         waveform=mock_waveform,
         antenna=array_pattern,
@@ -200,7 +199,7 @@ class TestRadar:
         """Radar stores all parameters correctly."""
         r = basic_radar
         assert r.carrier_freq == 9.65e9
-        assert r.prf == 1000.0
+        assert r.waveform.prf == 1000.0
         assert r.transmit_power == 500.0
         assert r.noise_figure == 3.0
         assert r.system_losses == 2.0
@@ -233,7 +232,6 @@ class TestRadar:
         """String values for polarization/mode/look_side convert to enums."""
         r = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=500.0,
             waveform=mock_waveform,
             antenna=array_pattern,
@@ -250,7 +248,6 @@ class TestRadar:
         """Enum instances pass through without conversion."""
         r = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=500.0,
             waveform=mock_waveform,
             antenna=array_pattern,
@@ -268,7 +265,6 @@ class TestRadar:
         with pytest.raises(ValueError, match="carrier_freq"):
             Radar(
                 carrier_freq=0,
-                prf=1000.0,
                 transmit_power=500.0,
                 waveform=mock_waveform,
                 antenna=array_pattern,
@@ -278,27 +274,16 @@ class TestRadar:
                 depression_angle=0.5,
             )
 
-    def test_invalid_prf(self, mock_waveform, array_pattern):
-        """prf <= 0 raises ValueError."""
+    def test_invalid_prf(self, array_pattern):
+        """prf <= 0 raises ValueError (validated by waveform)."""
         with pytest.raises(ValueError, match="prf"):
-            Radar(
-                carrier_freq=9.65e9,
-                prf=-1.0,
-                transmit_power=500.0,
-                waveform=mock_waveform,
-                antenna=array_pattern,
-                polarization="single",
-                mode="stripmap",
-                look_side="right",
-                depression_angle=0.5,
-            )
+            MockWaveform(bandwidth=50e6, duty_cycle=0.1, prf=-1.0)
 
     def test_invalid_transmit_power(self, mock_waveform, array_pattern):
         """transmit_power <= 0 raises ValueError."""
         with pytest.raises(ValueError, match="transmit_power"):
             Radar(
                 carrier_freq=9.65e9,
-                prf=1000.0,
                 transmit_power=0.0,
                 waveform=mock_waveform,
                 antenna=array_pattern,
@@ -313,7 +298,6 @@ class TestRadar:
         with pytest.raises(ValueError, match="noise_figure"):
             Radar(
                 carrier_freq=9.65e9,
-                prf=1000.0,
                 transmit_power=500.0,
                 waveform=mock_waveform,
                 antenna=array_pattern,
@@ -329,7 +313,6 @@ class TestRadar:
         with pytest.raises(ValueError, match="depression_angle"):
             Radar(
                 carrier_freq=9.65e9,
-                prf=1000.0,
                 transmit_power=500.0,
                 waveform=mock_waveform,
                 antenna=array_pattern,
@@ -344,7 +327,6 @@ class TestRadar:
         with pytest.raises(ValueError, match="waveform"):
             Radar(
                 carrier_freq=9.65e9,
-                prf=1000.0,
                 transmit_power=500.0,
                 waveform=None,
                 antenna=array_pattern,
@@ -382,11 +364,11 @@ class TestRadar:
                 return echo
 
         wf = HighDutyWaveform()
+        wf._prf = 1000.0
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             Radar(
                 carrier_freq=9.65e9,
-                prf=1000.0,
                 transmit_power=500.0,
                 waveform=wf,
                 antenna=array_pattern,
@@ -416,7 +398,6 @@ class TestRadarReceiverGain:
         """Custom receiver_gain is stored correctly."""
         r = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=500.0,
             waveform=mock_waveform,
             antenna=array_pattern,
@@ -433,7 +414,6 @@ class TestRadarReceiverGain:
         with pytest.raises(ValueError, match="receiver_gain_dB"):
             Radar(
                 carrier_freq=9.65e9,
-                prf=1000.0,
                 transmit_power=500.0,
                 waveform=mock_waveform,
                 antenna=array_pattern,
@@ -448,7 +428,6 @@ class TestRadarReceiverGain:
         """total_noise_figure = L_sys * F_rx in dB."""
         r = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=500.0,
             waveform=mock_waveform,
             antenna=array_pattern,
@@ -468,7 +447,6 @@ class TestRadarReceiverGain:
         """noise_power = k * T * B * F_total * G_rx."""
         r = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=500.0,
             waveform=mock_waveform,
             antenna=array_pattern,
@@ -489,7 +467,6 @@ class TestRadarReceiverGain:
         """With receiver_gain=0 and system_losses=0, noise_power matches old formula."""
         r = Radar(
             carrier_freq=9.65e9,
-            prf=1000.0,
             transmit_power=500.0,
             waveform=mock_waveform,
             antenna=array_pattern,

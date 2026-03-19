@@ -54,7 +54,7 @@ def main():
     # Compute axis conversions
     gate_near_range = result.gate_delay * C_LIGHT / 2.0
     range_bin_spacing = C_LIGHT / (2.0 * result.sample_rate)
-    az_spacing = np.linalg.norm(result.velocities[0]) / radar.prf
+    az_spacing = np.linalg.norm(result.velocities[0]) / radar.waveform.prf
 
     # --- Ground truth: compute broadside slant range and azimuth time for each target ---
     gt = []  # list of (label, broadside_range_m, broadside_pulse_idx, broadside_az_m, rcs)
@@ -74,7 +74,7 @@ def main():
     print("Generating Plot 1: Range-Time Diagram (range-compressed)...")
     rc_all = np.zeros_like(echo)
     for i in range(echo.shape[0]):
-        rc_all[i, :] = radar.waveform.range_compress(echo[i], radar.prf, result.sample_rate)
+        rc_all[i, :] = radar.waveform.range_compress(echo[i], radar.waveform.prf, result.sample_rate)
     rc_dB = 20 * np.log10(np.abs(rc_all) + 1e-30)
     vmax = np.max(rc_dB)
 
@@ -115,7 +115,7 @@ def main():
     raw = RawData(
         echo=echo, channel="single", sample_rate=result.sample_rate,
         carrier_freq=radar.carrier_freq, bandwidth=radar.bandwidth,
-        prf=radar.prf, waveform_name=radar.waveform.name,
+        prf=radar.waveform.prf, waveform_name=radar.waveform.name,
         sar_mode=radar.mode.value, gate_delay=result.gate_delay,
     )
     trajectory = Trajectory(

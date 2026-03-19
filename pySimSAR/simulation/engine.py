@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from pySimSAR.core.radar import C_LIGHT, K_BOLTZMANN, Radar
 from pySimSAR.core.scene import DistributedTarget, PointTarget, Scene
-from pySimSAR.core.types import PolarizationChannel, PolarizationMode, SARMode
+from pySimSAR.core.types import PolarizationChannel, PolarizationMode, SARMode, SARModeConfig
 
 if TYPE_CHECKING:
     from pySimSAR.core.platform import Platform
@@ -95,9 +95,9 @@ class SimulationResult:
             if radar is not None:
                 carrier_freq = radar.carrier_freq
                 bandwidth = radar.bandwidth
-                prf = radar.prf
+                prf = radar.waveform.prf
                 waveform_name = radar.waveform.name
-                sar_mode = radar.mode.value
+                sar_mode = radar.sar_mode_config.mode.value
 
             raw_data[ch] = RawData(
                 echo=echo,
@@ -175,6 +175,7 @@ class SimulationEngine:
         burst_length: int = 20,
         platform: Platform | None = None,
         swath_range: tuple[float, float] | None = None,
+        sar_mode_config: SARModeConfig | None = None,
     ) -> None:
         if n_pulses <= 0:
             raise ValueError(f"n_pulses must be positive, got {n_pulses}")
@@ -202,13 +203,18 @@ class SimulationEngine:
         else:
             self._start_pos = np.array([0.0, -5000.0, 2000.0])
 
-        self._scene_center = (
-            np.asarray(scene_center, dtype=float)
-            if scene_center is not None
-            else np.array([0.0, 0.0, 0.0])
-        )
-        self._n_subswaths = n_subswaths
-        self._burst_length = burst_length
+        # Build or accept SARModeConfig
+        if sar_mode_config is not None:
+            self._sar_mode_config = sar_mode_config
+        else:
+            self._sar_mode_config = SARModeConfig(
+                mode=radar.mode,
+                look_side=radar.look_side,
+                depression_angle=radar.depression_angle,
+                scene_center=scene_center,
+                n_subswaths=n_subswaths,
+                burst_length=burst_length,
+            )
         self._swath_range = swath_range
 
     @staticmethod
@@ -350,7 +356,7 @@ class SimulationEngine:
         n_samples : int
             Number of range samples in the receive window.
         """
-        wf_duration = self.radar.waveform.duration(self.radar.prf)
+        wf_duration = self.radar.waveform.duration()
 
         if self._swath_range is not None:
             near_range, far_range = self._swath_range
@@ -399,7 +405,7 @@ class SimulationEngine:
         if not ranges:
             # No targets — fall back to full PRI
             pri = self.radar.pri
-            wf_dur = self.radar.waveform.duration(self.radar.prf)
+            wf_dur = self.radar.waveform.duration()
             max_range = C_LIGHT * (pri - wf_dur) / 2.0 if wf_dur < pri else C_LIGHT * pri / 2.0
             return 0.0, max_range
 
@@ -452,10 +458,10 @@ class SimulationEngine:
             return None, None, None
 
         ideal = self._platform.generate_ideal_trajectory(
-            n_pulses=self.n_pulses, prf=self.radar.prf
+            n_pulses=self.n_pulses, prf=self.radar.waveform.prf
         )
         true = self._platform.generate_perturbed_trajectory(
-            n_pulses=self.n_pulses, prf=self.radar.prf, seed=self.seed
+            n_pulses=self.n_pulses, prf=self.radar.waveform.prf, seed=self.seed
         )
 
         # Generate navigation data from each attached sensor
@@ -483,7 +489,7 @@ class SimulationEngine:
         ideal_traj, true_traj, nav_data = self._generate_trajectories()
 
         # Generate transmit waveform
-        tx_signal = self.radar.waveform.generate(self.radar.prf, self.sample_rate)
+        tx_signal = self.radar.waveform.generate(self.radar.waveform.prf, self.sample_rate)
 
         # Pre-allocate echo matrices
         echoes: dict[str, np.ndarray] = {}
@@ -516,9 +522,7 @@ class SimulationEngine:
                 pos,
                 vel,
                 pulse_idx,
-                scene_center=self._scene_center,
-                n_subswaths=self._n_subswaths,
-                burst_length=self._burst_length,
+                sar_mode_config=self._sar_mode_config,
             )
 
             # Generate phase noise for this pulse (if waveform has it)

@@ -31,7 +31,7 @@ def _make_radar_and_trajectory(
     """Create a radar and trajectory for geocoding tests."""
     depression_angle = math.radians(depression_angle_deg)
 
-    waveform = LFMWaveform(bandwidth=bandwidth, duty_cycle=0.1)
+    waveform = LFMWaveform(bandwidth=bandwidth, duty_cycle=0.1, prf=prf)
     antenna = AntennaPattern(
         pattern_2d=lambda az, el: 30.0,
         az_beamwidth=math.radians(3.0),
@@ -40,7 +40,6 @@ def _make_radar_and_trajectory(
     )
     radar = Radar(
         carrier_freq=carrier_freq,
-        prf=prf,
         transmit_power=1000.0,
         waveform=waveform,
         antenna=antenna,

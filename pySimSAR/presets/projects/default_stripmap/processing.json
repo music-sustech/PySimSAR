@@ -1,0 +1,10 @@
+{
+  "image_formation": {
+    "algorithm": "range_doppler",
+    "params": {}
+  },
+  "moco": null,
+  "autofocus": null,
+  "geocoding": null,
+  "polarimetric_decomposition": null
+}

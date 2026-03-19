@@ -40,6 +40,7 @@ class FMCWWaveform(Waveform):
         ramp_type: RampType | str = "up",
         phase_noise=None,
         window=None,
+        prf: float | None = None,
     ) -> None:
         if isinstance(ramp_type, str):
             try:
@@ -54,6 +55,7 @@ class FMCWWaveform(Waveform):
             duty_cycle=duty_cycle,
             phase_noise=phase_noise,
             window=window,
+            prf=prf,
         )
         self._ramp_type = ramp_type
         self._tx_signal: np.ndarray | None = None

@@ -46,7 +46,7 @@ def _setup_quad_pol_simulation():
     scene.add_target(PointTarget(position=[5000.0, 0.0, 0.0], rcs=scattering_matrix))
 
     # 2. X-band LFM radar in quad-pol mode
-    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
     az = np.linspace(-np.pi, np.pi, 5)
     el = np.linspace(-np.pi / 2, np.pi / 2, 5)
     pattern = np.full((len(el), len(az)), 30.0)
@@ -60,7 +60,6 @@ def _setup_quad_pol_simulation():
     )
     radar = Radar(
         carrier_freq=9.65e9,
-        prf=1000.0,
         transmit_power=100.0,
         waveform=wf,
         antenna=antenna,
@@ -93,7 +92,7 @@ def _setup_quad_pol_simulation():
             sample_rate=sample_rate,
             carrier_freq=radar.carrier_freq,
             bandwidth=radar.bandwidth,
-            prf=radar.prf,
+            prf=radar.waveform.prf,
             waveform_name=radar.waveform.name,
             sar_mode="stripmap",
             gate_delay=result.gate_delay,

@@ -60,7 +60,7 @@ def _create_scene(n_targets: int = N_TARGETS) -> Scene:
 
 def _create_radar() -> Radar:
     """Create a standard X-band LFM radar configuration."""
-    waveform = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+    waveform = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
     antenna = create_antenna_from_preset(
         preset="sinc",
         az_beamwidth=np.radians(3.0),
@@ -69,7 +69,6 @@ def _create_radar() -> Radar:
     )
     return Radar(
         carrier_freq=9.65e9,  # X-band
-        prf=1000.0,
         transmit_power=100.0,
         waveform=waveform,
         antenna=antenna,
@@ -131,7 +130,7 @@ class TestSimulationBenchmark:
                 sample_rate=sample_rate,
                 carrier_freq=radar.carrier_freq,
                 bandwidth=bandwidth,
-                prf=radar.prf,
+                prf=radar.waveform.prf,
                 waveform_name=radar.waveform.name,
                 sar_mode="stripmap",
                 gate_delay=sim_result.gate_delay,

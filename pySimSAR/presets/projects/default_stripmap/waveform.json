@@ -1,0 +1,8 @@
+{
+  "type": "lfm",
+  "prf_hz": 1000.0,
+  "bandwidth_hz": 100000000.0,
+  "duty_cycle": 0.01,
+  "window": null,
+  "phase_noise": null
+}

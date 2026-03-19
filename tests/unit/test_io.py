@@ -339,7 +339,7 @@ class TestConfigSerialization:
         from pySimSAR.waveforms.lfm import LFMWaveform
 
         scene = Scene(origin_lat=40.0, origin_lon=-74.0, origin_alt=0.0)
-        wf = LFMWaveform(bandwidth=100e6, duty_cycle=0.1)
+        wf = LFMWaveform(bandwidth=100e6, duty_cycle=0.1, prf=1000.0)
 
         def sinc_pattern(az, el):
             return 30.0
@@ -349,7 +349,7 @@ class TestConfigSerialization:
             az_beamwidth=0.05, el_beamwidth=0.17, peak_gain_dB=30.0,
         )
         radar = Radar(
-            carrier_freq=9.6e9, prf=1000.0, transmit_power=1000.0, antenna=antenna,
+            carrier_freq=9.6e9, transmit_power=1000.0, antenna=antenna,
             waveform=wf, polarization="single", mode="stripmap",
             look_side="right", depression_angle=0.7,
         )

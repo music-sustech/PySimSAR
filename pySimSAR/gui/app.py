@@ -1,7 +1,9 @@
 """Main application window for the PySimSAR GUI.
 
-Wires together parameter editors, algorithm selector, visualization panels,
-and the simulation controller into a single QMainWindow.
+Layout (post-overhaul):
+  Left panel:  ParameterTreeWidget (scrollable inline-editing tree)
+  Right panel: Visualization tabs (top) + Calculated values panel (bottom)
+  Bottom:      Full-width status bar with progress
 """
 
 from __future__ import annotations
@@ -12,14 +14,17 @@ from pathlib import Path
 
 import numpy as np
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication,
+    QCheckBox,
+    QComboBox,
+    QDialog,
     QFileDialog,
+    QFormLayout,
     QMainWindow,
     QMessageBox,
     QProgressBar,
-    QScrollArea,
     QSplitter,
     QTabWidget,
     QToolBar,
@@ -27,28 +32,33 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from pySimSAR.gui.widgets.param_editor import (
-    AntennaParamEditor,
-    RadarParamEditor,
-    WaveformParamEditor,
-    PlatformParamEditor,
-    SceneParamEditor,
-    SimulationParamEditor,
-)
-from pySimSAR.gui.widgets.algorithm_selector import AlgorithmSelector
+from pySimSAR.gui.widgets.param_tree import ParameterTreeWidget
+from pySimSAR.gui.widgets.calc_panel import CalculatedValuesPanel
+from pySimSAR.gui.widgets.preset_browser import PresetBrowserDialog
+from pySimSAR.gui.wizards.project_wizard import ProjectCreationWizard
+from pySimSAR.gui.wizards.import_wizard import ImportWizard
 from pySimSAR.gui.panels.scene_3d import SceneViewerPanel
 from pySimSAR.gui.panels.trajectory import TrajectoryViewerPanel
 from pySimSAR.gui.panels.beam_animation import BeamAnimationPanel
 from pySimSAR.gui.panels.image_viewer import ImageViewerPanel
+from pySimSAR.gui.panels.phase_history import PhaseHistoryPanel
+from pySimSAR.gui.panels.range_profile import RangeProfilePanel
+from pySimSAR.gui.panels.azimuth_profile import AzimuthProfilePanel
+from pySimSAR.gui.panels.doppler_spectrum import DopplerSpectrumPanel
+from pySimSAR.gui.panels.polarimetry import PolarimetryPanel
 from pySimSAR.gui.controllers.simulation_ctrl import SimulationController, ProjectModel
 from pySimSAR.core.scene import Scene, PointTarget
-from pySimSAR.core.radar import Radar, AntennaPattern, create_antenna_from_preset
+from pySimSAR.core.radar import Radar, create_antenna_from_preset
+from pySimSAR.core.types import SARModeConfig
 from pySimSAR.core.platform import Platform
-from pySimSAR.core.types import SARImage
+from pySimSAR.core.flight_path import compute_flight_path
 from pySimSAR.waveforms.lfm import LFMWaveform
 from pySimSAR.waveforms.fmcw import FMCWWaveform
 from pySimSAR.waveforms.phase_noise import CompositePSDPhaseNoise
+from pySimSAR.io.archive import pack_project, unpack_project
 from pySimSAR.io.config import ProcessingConfig
+from pySimSAR.io.parameter_set import load_default_gui_params
+from pySimSAR.io.user_data import UserDataDir
 from pySimSAR.motion.perturbation import DrydenTurbulence
 from pySimSAR.sensors.gps import GPSSensor
 from pySimSAR.sensors.gps_gaussian import GaussianGPSError
@@ -56,14 +66,58 @@ from pySimSAR.sensors.imu import IMUSensor
 from pySimSAR.sensors.imu_white_noise import WhiteNoiseIMUError
 
 
+class PreferencesDialog(QDialog):
+    """Application preferences dialog."""
+
+    def __init__(self, prefs: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Preferences")
+        self.setMinimumWidth(350)
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        layout.addLayout(form)
+
+        self._tooltips = QCheckBox()
+        self._tooltips.setChecked(prefs.get("tooltips_enabled", True))
+        form.addRow("Show tooltips:", self._tooltips)
+
+        self._colormap = QComboBox()
+        self._colormap.addItems(["gray", "viridis", "plasma", "inferno", "magma", "jet"])
+        self._colormap.setCurrentText(prefs.get("default_colormap", "gray"))
+        form.addRow("Default colormap:", self._colormap)
+
+        from pySimSAR.gui.widgets.param_editor import _plain_spin
+        self._dynamic_range = _plain_spin(
+            prefs.get("default_dynamic_range_dB", 40.0), 10.0, 120.0, 5.0, " dB"
+        )
+        form.addRow("Default dynamic range:", self._dynamic_range)
+
+        from PyQt6.QtWidgets import QDialogButtonBox
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def get_preferences(self) -> dict:
+        return {
+            "tooltips_enabled": self._tooltips.isChecked(),
+            "default_colormap": self._colormap.currentText(),
+            "default_dynamic_range_dB": self._dynamic_range.value(),
+        }
+
+
 class MainWindow(QMainWindow):
     """Main application window for PySimSAR.
 
     Layout
     ------
-    Left sidebar: scrollable parameter editors and algorithm selector.
-    Right area: tabbed visualization panels (3D Scene, Trajectory,
-    Beam Animation, SAR Image).
+    Left:   ParameterTreeWidget (scrollable, inline-editing parameter tree)
+    Right:  QSplitter(vertical)
+              Top:    QTabWidget with visualization panels
+              Bottom: CalculatedValuesPanel
+    Bottom: Status bar with progress bar
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -74,6 +128,9 @@ class MainWindow(QMainWindow):
 
         self._controller: SimulationController | None = None
         self._model: ProjectModel | None = None
+        self._user_data = UserDataDir()
+        self._user_data.ensure_structure()
+        self._preferences = self._user_data.load_preferences()
 
         # -- Build UI components --
         self._build_menu_bar()
@@ -81,8 +138,19 @@ class MainWindow(QMainWindow):
         self._build_status_bar()
         self._build_central_widget()
 
-        # Show initial scene preview (platform trajectory)
+        # Wire parameter tree signals
+        self._param_tree.parameter_changed.connect(self._on_parameter_changed)
+
+        # Load default project into the parameter tree
+        try:
+            default_params = load_default_gui_params()
+            self._param_tree.set_all_parameters(default_params)
+        except Exception:
+            pass  # Fall back to widget-level defaults
+
+        # Initial scene preview + calc panel update
         self._update_scene_preview()
+        self._update_calc_panel()
 
     # ==================================================================
     # UI construction
@@ -109,12 +177,31 @@ class MainWindow(QMainWindow):
         self._action_save.triggered.connect(self._on_save_project)
         file_menu.addAction(self._action_save)
 
+        self._action_open = QAction("&Open Project...", self)
+        self._action_open.setShortcut("Ctrl+O")
+        self._action_open.triggered.connect(self._on_open_project)
+        file_menu.addAction(self._action_open)
+
         file_menu.addSeparator()
 
         self._action_exit = QAction("E&xit", self)
         self._action_exit.setShortcut("Ctrl+Q")
         self._action_exit.triggered.connect(self.close)
         file_menu.addAction(self._action_exit)
+
+        # -- Edit menu --
+        edit_menu = menu_bar.addMenu("&Edit")
+
+        self._action_prefs = QAction("&Preferences...", self)
+        self._action_prefs.triggered.connect(self._on_preferences)
+        edit_menu.addAction(self._action_prefs)
+
+        # -- Tools menu --
+        tools_menu = menu_bar.addMenu("&Tools")
+
+        self._action_presets = QAction("Preset &Browser...", self)
+        self._action_presets.triggered.connect(self._on_preset_browser)
+        tools_menu.addAction(self._action_presets)
 
         # -- Simulation menu --
         sim_menu = menu_bar.addMenu("&Simulation")
@@ -152,41 +239,11 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Ready")
 
     def _build_central_widget(self) -> None:
-        # -- Left sidebar: parameter editors inside a scroll area --
-        sidebar_widget = QWidget()
-        sidebar_layout = QVBoxLayout(sidebar_widget)
-        sidebar_layout.setContentsMargins(4, 4, 4, 4)
+        # -- Left panel: ParameterTreeWidget --
+        self._param_tree = ParameterTreeWidget()
+        self._param_tree.setMinimumWidth(360)
 
-        self._sim_editor = SimulationParamEditor()
-        self._radar_editor = RadarParamEditor()
-        self._antenna_editor = AntennaParamEditor()
-        self._waveform_editor = WaveformParamEditor()
-        self._platform_editor = PlatformParamEditor()
-        self._scene_editor = SceneParamEditor()
-        self._algorithm_selector = AlgorithmSelector()
-
-        sidebar_layout.addWidget(self._sim_editor)
-        sidebar_layout.addWidget(self._radar_editor)
-        sidebar_layout.addWidget(self._antenna_editor)
-        sidebar_layout.addWidget(self._waveform_editor)
-        sidebar_layout.addWidget(self._platform_editor)
-        sidebar_layout.addWidget(self._scene_editor)
-        sidebar_layout.addWidget(self._algorithm_selector)
-        sidebar_layout.addStretch()
-
-        # Live-update scene preview when params change
-        self._scene_editor.params_changed.connect(self._update_scene_preview)
-        self._platform_editor.params_changed.connect(self._update_scene_preview)
-        self._sim_editor.params_changed.connect(self._update_scene_preview)
-        self._radar_editor.params_changed.connect(self._update_scene_preview)
-        self._antenna_editor.params_changed.connect(self._update_scene_preview)
-
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setWidget(sidebar_widget)
-        scroll_area.setMinimumWidth(320)
-
-        # -- Right area: tabbed visualization panels --
+        # -- Right panel: viz tabs (top) + calc panel (bottom) --
         self._tab_widget = QTabWidget()
 
         self._scene_panel = SceneViewerPanel()
@@ -194,20 +251,104 @@ class MainWindow(QMainWindow):
         self._beam_panel = BeamAnimationPanel()
         self._image_panel = ImageViewerPanel()
 
+        self._phase_history_panel = PhaseHistoryPanel()
+        self._range_profile_panel = RangeProfilePanel()
+        self._azimuth_profile_panel = AzimuthProfilePanel()
+        self._doppler_panel = DopplerSpectrumPanel()
+        self._polarimetry_panel = PolarimetryPanel()
+
         self._tab_widget.addTab(self._scene_panel, "3D Scene")
         self._tab_widget.addTab(self._trajectory_panel, "Trajectory")
         self._tab_widget.addTab(self._beam_panel, "Beam Animation")
         self._tab_widget.addTab(self._image_panel, "SAR Image")
+        self._tab_widget.addTab(self._phase_history_panel, "Phase History")
+        self._tab_widget.addTab(self._range_profile_panel, "Range Profile")
+        self._tab_widget.addTab(self._azimuth_profile_panel, "Azimuth Profile")
+        self._tab_widget.addTab(self._doppler_panel, "Doppler Spectrum")
+        self._tab_widget.addTab(self._polarimetry_panel, "Polarimetry")
 
-        # -- Splitter --
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(scroll_area)
-        splitter.addWidget(self._tab_widget)
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([380, 1020])
+        self._calc_panel = CalculatedValuesPanel()
 
-        self.setCentralWidget(splitter)
+        right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.addWidget(self._tab_widget)
+        right_splitter.addWidget(self._calc_panel)
+        right_splitter.setStretchFactor(0, 3)
+        right_splitter.setStretchFactor(1, 1)
+        right_splitter.setSizes([600, 250])
+
+        # -- Main horizontal splitter --
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_splitter.addWidget(self._param_tree)
+        main_splitter.addWidget(right_splitter)
+        main_splitter.setStretchFactor(0, 0)
+        main_splitter.setStretchFactor(1, 1)
+        main_splitter.setSizes([400, 1000])
+
+        self.setCentralWidget(main_splitter)
+
+    # ==================================================================
+    # Parameter change handling
+    # ==================================================================
+
+    def _on_parameter_changed(self, key: str, value: object) -> None:
+        """Handle any parameter change from the tree."""
+        self._update_scene_preview()
+        self._update_calc_panel()
+
+    def _update_calc_panel(self) -> None:
+        """Recompute calculated values from current tree params."""
+        try:
+            all_p = self._param_tree.get_all_parameters()
+            # Build flat params dict for calculator
+            radar = all_p.get("radar", {})
+            sarmode = all_p.get("sarmode", {})
+            antenna = all_p.get("antenna", {})
+            waveform = all_p.get("waveform", {})
+            platform = all_p.get("platform", {})
+            simulation = all_p.get("simulation", {})
+            scene = all_p.get("scene", {})
+
+            calc_params = {
+                "carrier_freq": radar.get("carrier_freq", 9.65e9),
+                "prf": waveform.get("prf", 1000.0),
+                "bandwidth": waveform.get("bandwidth", 100e6),
+                "duty_cycle": waveform.get("duty_cycle", 0.01),
+                "transmit_power": radar.get("transmit_power", 1000.0),
+                "az_beamwidth": antenna.get("az_beamwidth", math.radians(10.0)),
+                "el_beamwidth": antenna.get("el_beamwidth", math.radians(10.0)),
+                "peak_gain_dB": antenna.get("peak_gain_dB", 30.0),
+                "depression_angle": sarmode.get("depression_angle", math.radians(45.0)),
+                "velocity": platform.get("velocity", 100.0),
+                "altitude": platform.get("altitude", 1000.0),
+                "noise_figure": radar.get("noise_figure", 3.0),
+                "system_losses": radar.get("system_losses", 2.0),
+                "receiver_gain_dB": radar.get("receiver_gain_dB", 30.0),
+                "reference_temp": radar.get("reference_temp", 290.0),
+                "mode": sarmode.get("mode", "stripmap"),
+            }
+
+            # Swath range
+            swath = simulation.get("swath_range")
+            if swath is not None:
+                calc_params["near_range"] = swath[0]
+                calc_params["far_range"] = swath[1]
+
+            # Flight path
+            fp_mode = platform.get("flight_path_mode", "start_stop")
+            start = platform.get("start_position")
+            if fp_mode == "start_stop":
+                stop = platform.get("stop_position")
+                if start and stop:
+                    calc_params["start_position"] = start
+                    calc_params["stop_position"] = stop
+            else:
+                ft = platform.get("flight_time")
+                if ft:
+                    calc_params["flight_time"] = ft
+
+            self._calc_panel.update(calc_params)
+        except Exception:
+            pass
 
     # ==================================================================
     # Live scene preview
@@ -216,7 +357,13 @@ class MainWindow(QMainWindow):
     def _update_scene_preview(self) -> None:
         """Refresh the 3D scene panel with current targets and platform."""
         try:
-            scene_params = self._scene_editor.get_params()
+            all_p = self._param_tree.get_all_parameters()
+            scene_params = all_p["scene"]
+            sarmode_params = all_p["sarmode"]
+            waveform_params = all_p["waveform"]
+            platform_params = all_p["platform"]
+            simulation_params = all_p["simulation"]
+
             scene = Scene(
                 origin_lat=scene_params["origin_lat"],
                 origin_lon=scene_params["origin_lon"],
@@ -227,17 +374,10 @@ class MainWindow(QMainWindow):
                 scene.add_target(PointTarget(position=pos, rcs=t["rcs"]))
             self._scene_panel.update_scene(scene)
 
-            # Show platform start and projected trajectory
-            plat_params = self._platform_editor.get_params()
-            start = np.array(plat_params["start_position"], dtype=float)
-            sim_params = self._sim_editor.get_params()
-            radar_params = self._radar_editor.get_params()
-
-            # Compute projected trajectory line
-            n_pulses = sim_params["n_pulses"]
-            prf = radar_params["prf"]
-            velocity = plat_params["velocity"]
-            heading_vec = np.array(plat_params["heading"], dtype=float)
+            # Compute projected trajectory
+            start = np.array(platform_params["start_position"], dtype=float)
+            velocity = platform_params["velocity"]
+            heading_vec = np.array(platform_params["heading"], dtype=float)
             h_norm = np.linalg.norm(heading_vec)
             if h_norm < 1e-12:
                 heading_vec = np.array([0.0, 1.0, 0.0])
@@ -245,8 +385,22 @@ class MainWindow(QMainWindow):
                 heading_vec = heading_vec / h_norm
             vel_vec = velocity * heading_vec
             heading_rad = float(np.arctan2(heading_vec[0], heading_vec[1]))
+
+            # Derive n_pulses from flight path
+            prf = waveform_params.get("prf", 1000.0)
+            fp_mode = platform_params.get("flight_path_mode", "start_stop")
+            if fp_mode == "start_stop" and "stop_position" in platform_params:
+                stop = np.array(platform_params["stop_position"], dtype=float)
+                dist = np.linalg.norm(stop - start)
+                total_time = dist / velocity if velocity > 0 else 1.0
+            elif "flight_time" in platform_params:
+                total_time = platform_params["flight_time"]
+            else:
+                # Fallback: use a default
+                total_time = 5.0
+
+            n_pulses = max(2, int(prf * total_time))
             dt = 1.0 / prf if prf > 0 else 0.001
-            total_time = n_pulses * dt
             times = np.linspace(0, total_time, min(n_pulses, 500))
             traj = np.column_stack([
                 start[0] + vel_vec[0] * times,
@@ -256,23 +410,31 @@ class MainWindow(QMainWindow):
             self._scene_panel.update_platform(
                 start_position=start,
                 trajectory_positions=traj,
-                depression_angle=math.degrees(radar_params["depression_angle"]),
-                look_side=radar_params["look_side"],
+                depression_angle=math.degrees(sarmode_params["depression_angle"]),
+                look_side=sarmode_params["look_side"],
                 heading_rad=heading_rad,
             )
         except Exception:
-            pass  # Non-critical, don't block the user
+            pass  # Non-critical
 
     # ==================================================================
     # Model building helpers
     # ==================================================================
 
     def _build_project_model(self) -> ProjectModel:
-        """Collect parameters from all editors and construct a ProjectModel."""
+        """Collect parameters from tree and construct a ProjectModel."""
         model = ProjectModel()
+        all_p = self._param_tree.get_all_parameters()
+        scene_params = all_p["scene"]
+        sarmode_params = all_p["sarmode"]
+        radar_params = all_p["radar"]
+        antenna_params = all_p["antenna"]
+        waveform_params = all_p["waveform"]
+        platform_params = all_p["platform"]
+        simulation_params = all_p["simulation"]
+        proc_params = all_p["processing_config"]
 
         # -- Scene --
-        scene_params = self._scene_editor.get_params()
         scene = Scene(
             origin_lat=scene_params["origin_lat"],
             origin_lon=scene_params["origin_lon"],
@@ -287,8 +449,7 @@ class MainWindow(QMainWindow):
         model.scene = scene
 
         # -- Waveform --
-        wf_params = self._waveform_editor.get_params()
-        # Build optional phase noise model
+        wf_params = waveform_params
         phase_noise = None
         pn = wf_params.get("phase_noise")
         if pn is not None:
@@ -298,17 +459,18 @@ class MainWindow(QMainWindow):
                 flicker_pm_level=pn["flicker_pm_level"],
                 white_floor=pn["white_floor"],
             )
-        # Build optional window function
         window = wf_params.get("window")
         if window is not None:
             window = getattr(np, window, None)
 
+        prf = wf_params.get("prf", 1000.0)
         if wf_params["waveform_type"] == "LFM":
             waveform = LFMWaveform(
                 bandwidth=wf_params["bandwidth"],
                 duty_cycle=wf_params.get("duty_cycle", 0.01),
                 phase_noise=phase_noise,
                 window=window,
+                prf=prf,
             )
         else:
             waveform = FMCWWaveform(
@@ -317,57 +479,63 @@ class MainWindow(QMainWindow):
                 ramp_type=wf_params.get("ramp_type", "up"),
                 phase_noise=phase_noise,
                 window=window,
+                prf=prf,
             )
 
         # -- Antenna --
-        ant_params = self._antenna_editor.get_params()
         antenna = create_antenna_from_preset(
-            preset=ant_params["preset"],
-            az_beamwidth=ant_params["az_beamwidth"],
-            el_beamwidth=ant_params["el_beamwidth"],
-            peak_gain_dB=ant_params["peak_gain_dB"],
+            preset=antenna_params["preset"],
+            az_beamwidth=antenna_params["az_beamwidth"],
+            el_beamwidth=antenna_params["el_beamwidth"],
+            peak_gain_dB=antenna_params["peak_gain_dB"],
+        )
+
+        # -- SAR Imaging config --
+        sar_mode_config = SARModeConfig(
+            mode=sarmode_params["mode"],
+            look_side=sarmode_params["look_side"],
+            depression_angle=sarmode_params["depression_angle"],
+            scene_center=np.array(sarmode_params.get("scene_center", [0, 0, 0]), dtype=float),
+            n_subswaths=sarmode_params.get("n_subswaths", 3),
+            burst_length=sarmode_params.get("burst_length", 20),
         )
 
         # -- Radar --
-        radar_params = self._radar_editor.get_params()
         model.radar = Radar(
             carrier_freq=radar_params["carrier_freq"],
-            prf=radar_params["prf"],
             transmit_power=radar_params["transmit_power"],
             waveform=waveform,
             antenna=antenna,
             polarization=radar_params["polarization"],
-            mode=radar_params["mode"],
-            look_side=radar_params["look_side"],
-            depression_angle=radar_params["depression_angle"],
             squint_angle=radar_params["squint_angle"],
             receiver_gain_dB=radar_params["receiver_gain_dB"],
             system_losses=radar_params["system_losses"],
             noise_figure=radar_params["noise_figure"],
             reference_temp=radar_params["reference_temp"],
+            sar_mode_config=sar_mode_config,
         )
 
         # -- Platform --
-        plat_params = self._platform_editor.get_params()
-        start_pos = np.array(plat_params["start_position"], dtype=float)
+        plat = platform_params
+        start_pos = np.array(plat["start_position"], dtype=float)
         perturbation = None
-        if plat_params.get("perturbation") is not None:
-            p = plat_params["perturbation"]
+        if plat.get("perturbation") is not None:
+            p = plat["perturbation"]
             perturbation = DrydenTurbulence(
                 sigma_u=p["sigma_u"],
                 sigma_v=p["sigma_v"],
                 sigma_w=p["sigma_w"],
             )
         sensors = []
-        if plat_params.get("gps") is not None:
-            g = plat_params["gps"]
+        if plat.get("gps") is not None:
+            g = plat["gps"]
             sensors.append(GPSSensor(
                 accuracy_rms=g["accuracy"],
                 update_rate=g["rate"],
                 error_model=GaussianGPSError(sigma=g["accuracy"]),
             ))
-        if plat_params.get("imu") is not None:
-            i = plat_params["imu"]
+        if plat.get("imu") is not None:
+            i = plat["imu"]
             sensors.append(IMUSensor(
                 accel_noise_density=i["accel_noise"],
                 gyro_noise_density=i["gyro_noise"],
@@ -378,26 +546,50 @@ class MainWindow(QMainWindow):
                 ),
             ))
         model.platform = Platform(
-            velocity=plat_params["velocity"],
-            altitude=plat_params["altitude"],
-            heading=np.array(plat_params["heading"], dtype=float),
+            velocity=plat["velocity"],
+            altitude=plat["altitude"],
+            heading=np.array(plat["heading"], dtype=float),
             start_position=start_pos,
             perturbation=perturbation,
             sensors=sensors if sensors else None,
         )
 
-        # -- Simulation --
-        sim_params = self._sim_editor.get_params()
-        model.n_pulses = sim_params["n_pulses"]
-        model.seed = sim_params["seed"]
-        model.swath_range = sim_params.get("swath_range")
-        model.sample_rate = sim_params.get("sample_rate")
-        model.scene_center = sim_params.get("scene_center")
-        model.n_subswaths = sim_params.get("n_subswaths", 3)
-        model.burst_length = sim_params.get("burst_length", 20)
+        # -- Simulation (n_pulses derived from flight path) --
+        fp_mode = plat.get("flight_path_mode", "start_stop")
+        prf = waveform_params.get("prf", 1000.0)
+        if fp_mode == "start_stop" and "stop_position" in plat:
+            try:
+                fp = compute_flight_path(
+                    start_position=plat["start_position"],
+                    stop_position=plat["stop_position"],
+                    velocity=plat["velocity"],
+                    prf=prf,
+                )
+                model.n_pulses = fp.n_pulses or 512
+            except Exception:
+                model.n_pulses = 512
+        elif "flight_time" in plat:
+            model.n_pulses = max(1, int(prf * plat["flight_time"]))
+        else:
+            model.n_pulses = 512
+
+        model.seed = simulation_params["seed"]
+        model.swath_range = simulation_params.get("swath_range")
+        model.sample_rate = simulation_params.get("sample_rate")
+        model.sar_mode_config = sar_mode_config
 
         # -- Processing config --
-        model.processing_config = self._algorithm_selector.get_config()
+        pc = proc_params
+        model.processing_config = ProcessingConfig(
+            image_formation=pc.get("image_formation", "range_doppler"),
+            image_formation_params=pc.get("image_formation_params", {}),
+            moco=pc.get("moco"),
+            moco_params=pc.get("moco_params", {}),
+            autofocus=pc.get("autofocus"),
+            autofocus_params=pc.get("autofocus_params", {}),
+            geocoding=pc.get("geocoding"),
+            polarimetric_decomposition=pc.get("polarimetric_decomposition"),
+        )
 
         return model
 
@@ -426,7 +618,6 @@ class MainWindow(QMainWindow):
         self._controller.finished.connect(self._on_finished)
         self._controller.error.connect(self._on_error)
 
-        # Update UI state
         self._action_run.setEnabled(False)
         self._tb_run.setEnabled(False)
         self._action_cancel.setEnabled(True)
@@ -437,34 +628,27 @@ class MainWindow(QMainWindow):
         self._controller.start(self._model, run_pipeline=True)
 
     def _on_cancel(self) -> None:
-        """Cancel the currently running simulation."""
         if self._controller is not None:
             self._controller.cancel()
         self.statusBar().showMessage("Cancellation requested...")
 
     def _on_progress(self, value: int) -> None:
-        """Update the progress bar."""
         self._progress_bar.setValue(value)
 
     def _on_finished(self, model: ProjectModel) -> None:
-        """Handle simulation completion: update all visualization panels."""
         self._model = model
         self._restore_run_state()
         self._progress_bar.setValue(100)
         self.statusBar().showMessage("Simulation complete.")
-
-        # Update visualization panels with results
         self._update_panels(model)
 
     def _on_error(self, message: str) -> None:
-        """Handle simulation error."""
         self._restore_run_state()
         self._progress_bar.setValue(0)
         self.statusBar().showMessage("Simulation failed.")
         QMessageBox.critical(self, "Simulation Error", message)
 
     def _restore_run_state(self) -> None:
-        """Re-enable the Run button and disable Cancel after simulation ends."""
         self._action_run.setEnabled(True)
         self._tb_run.setEnabled(True)
         self._action_cancel.setEnabled(False)
@@ -472,124 +656,107 @@ class MainWindow(QMainWindow):
 
     def _update_panels(self, model: ProjectModel) -> None:
         """Push simulation/pipeline results into the visualization panels."""
-        # Scene + platform (re-add both so platform isn't lost)
         self._update_scene_preview()
 
-        # Trajectories
         if model.simulation_result is not None:
             sim = model.simulation_result
             ideal_traj = getattr(sim, "ideal_trajectory", None)
             true_traj = getattr(sim, "true_trajectory", None)
             self._trajectory_panel.update_trajectories(ideal_traj, true_traj)
 
-            # Beam animation
             if true_traj is not None and model.radar is not None:
                 try:
                     self._beam_panel.setup(true_traj, model.radar)
                 except Exception:
-                    pass  # Non-critical
+                    pass
 
-        # SAR Image (show the first available image from pipeline results)
         if model.pipeline_result is not None:
-            images = model.pipeline_result.images
+            pr = model.pipeline_result
+            images = pr.images
             if images:
-                # images is a dict; show the first one
                 first_key = next(iter(images))
                 first_image = images[first_key]
                 self._image_panel.update_image(first_image)
+                self._range_profile_panel.update(first_image)
+                self._azimuth_profile_panel.update(first_image)
                 self._tab_widget.setCurrentWidget(self._image_panel)
+
+            # Phase history (intermediate result)
+            if pr.phase_history:
+                first_phd = next(iter(pr.phase_history.values()))
+                self._phase_history_panel.update(first_phd)
+
+            # Doppler spectrum (from raw data reference)
+            if pr.raw_data_ref:
+                first_rd = next(iter(pr.raw_data_ref.values()))
+                self._doppler_panel.update(first_rd, model.radar)
+
+            # Polarimetric decomposition
+            if pr.decomposition:
+                self._polarimetry_panel.update(pr.decomposition)
 
     # ==================================================================
     # File menu actions
     # ==================================================================
 
     def _on_new_project(self) -> None:
-        """Reset all editors and panels to defaults."""
-        # Reset editors to default values
-        self._sim_editor.set_params({
-            "n_pulses": 512, "seed": 42, "swath_range": (1350.0, 1500.0),
-            "sample_rate": None, "scene_center": [0, 0, 0],
-            "n_subswaths": 3, "burst_length": 20,
-        })
-        self._radar_editor.set_params({
-            "carrier_freq": 9.65e9,
-            "prf": 1000.0,
-            "transmit_power": 1000.0,
-            "receiver_gain_dB": 30.0,
-            "system_losses": 2.0,
-            "noise_figure": 3.0,
-            "squint_angle": 0.0,
-            "reference_temp": 290.0,
-            "polarization": "single",
-            "mode": "stripmap",
-            "look_side": "right",
-            "depression_angle": 0.7854,
-        })
-        self._antenna_editor.set_params({
-            "preset": "flat",
-            "az_beamwidth": math.radians(10.0),
-            "el_beamwidth": math.radians(10.0),
-            "peak_gain_dB": 30.0,
-        })
-        self._waveform_editor.set_params({
-            "waveform_type": "LFM",
-            "bandwidth": 100e6,
-            "duty_cycle": 0.01,
-            "window": None,
-            "phase_noise": None,
-        })
-        self._platform_editor.set_params({
-            "velocity": 100.0,
-            "heading": [0.0, 1.0, 0.0],
-            "start_position": [0.0, -25.0, 1000.0],
-            "perturbation": None,
-            "gps": None,
-            "imu": None,
-        })
-        self._scene_editor.set_params({
-            "origin_lat": 0.0,
-            "origin_lon": 0.0,
-            "origin_alt": 0.0,
-            "targets": [{"position": [1000, 0, 0], "rcs": 1.0}],
-        })
+        """Launch the project creation wizard."""
+        wizard = ProjectCreationWizard(self)
+        if wizard.exec() == QDialog.DialogCode.Accepted:
+            params = wizard.get_parameters()
+            self._param_tree.set_all_parameters(params)
 
-        # Clear panels
-        self._scene_panel.clear()
-        self._trajectory_panel.clear()
-        self._beam_panel.clear()
-        self._image_panel.clear()
+            # Clear panels
+            self._scene_panel.clear()
+            self._trajectory_panel.clear()
+            self._beam_panel.clear()
+            self._image_panel.clear()
+            self._phase_history_panel.clear()
+            self._range_profile_panel.clear()
+            self._azimuth_profile_panel.clear()
+            self._doppler_panel.clear()
+            self._polarimetry_panel.clear()
+            self._calc_panel.clear()
 
-        # Reset state
-        self._model = None
-        self._progress_bar.setValue(0)
-        self.statusBar().showMessage("New project created.")
+            self._model = None
+            self._progress_bar.setValue(0)
+            self.statusBar().showMessage("New project created.")
+
+            self._update_scene_preview()
+            self._update_calc_panel()
 
     def _on_import_hdf5(self) -> None:
-        """Open a file dialog to import an HDF5 file for processing-only."""
-        filepath, _ = QFileDialog.getOpenFileName(
-            self,
-            "Import HDF5 File",
-            "",
-            "HDF5 Files (*.h5 *.hdf5);;All Files (*)",
-        )
-        if not filepath:
-            return
-
-        try:
-            model = ProjectModel()
-            model.import_from_hdf5(filepath)
-            model.processing_config = self._algorithm_selector.get_config()
-            self._model = model
-            self.statusBar().showMessage(f"Imported: {Path(filepath).name}")
-        except Exception as exc:
-            QMessageBox.critical(
-                self,
-                "Import Error",
-                f"Failed to import HDF5 file:\n{exc}",
-            )
+        """Launch import wizard for HDF5 data."""
+        wizard = ImportWizard(self)
+        if wizard.exec() == QDialog.DialogCode.Accepted:
+            filepath = wizard.get_filepath()
+            if not filepath:
+                return
+            try:
+                model = ProjectModel()
+                model.import_from_hdf5(filepath)
+                pc = self._param_tree.get_all_parameters()["processing_config"]
+                model.processing_config = ProcessingConfig(
+                    image_formation=pc.get("image_formation", "range_doppler"),
+                    image_formation_params=pc.get("image_formation_params", {}),
+                    moco=pc.get("moco"),
+                    moco_params=pc.get("moco_params", {}),
+                    autofocus=pc.get("autofocus"),
+                    autofocus_params=pc.get("autofocus_params", {}),
+                    geocoding=pc.get("geocoding"),
+                    polarimetric_decomposition=pc.get("polarimetric_decomposition"),
+                )
+                self._model = model
+                self.statusBar().showMessage(f"Imported: {Path(filepath).name}")
+            except Exception as exc:
+                QMessageBox.critical(
+                    self,
+                    "Import Error",
+                    f"Failed to import HDF5 file:\n{exc}",
+                )
 
     def _on_save_project(self) -> None:
-        """Save the current project state to an HDF5 file."""
+        """Save the current project state to HDF5 or .pysimsar archive."""
         if self._model is None:
             QMessageBox.information(
                 self,
@@ -598,24 +765,109 @@ class MainWindow(QMainWindow):
             )
             return
 
-        filepath, _ = QFileDialog.getSaveFileName(
+        filepath, selected_filter = QFileDialog.getSaveFileName(
             self,
             "Save Project",
             "",
-            "HDF5 Files (*.h5 *.hdf5);;All Files (*)",
+            "HDF5 Files (*.h5 *.hdf5);;PySimSAR Archive (*.pysimsar);;All Files (*)",
         )
         if not filepath:
             return
 
         try:
-            self._model.save_project(filepath)
-            self.statusBar().showMessage(f"Saved: {Path(filepath).name}")
+            fp = Path(filepath)
+            if fp.suffix == ".pysimsar":
+                # Save HDF5 to temp dir, then pack
+                import tempfile
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    h5_path = Path(tmpdir) / "project.h5"
+                    self._model.save_project(str(h5_path))
+                    # Save current parameters as JSON
+                    import json
+                    params = self._param_tree.get_all_parameters()
+                    params_path = Path(tmpdir) / "parameters.json"
+                    with open(params_path, "w", encoding="utf-8") as f:
+                        json.dump(params, f, indent=2, default=str)
+                    pack_project(tmpdir, fp)
+            else:
+                self._model.save_project(filepath)
+            self.statusBar().showMessage(f"Saved: {fp.name}")
         except Exception as exc:
             QMessageBox.critical(
                 self,
                 "Save Error",
                 f"Failed to save project:\n{exc}",
             )
+
+    def _on_open_project(self) -> None:
+        """Open a project from HDF5 or .pysimsar archive."""
+        filepath, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Project",
+            "",
+            "All Project Files (*.h5 *.hdf5 *.pysimsar);;HDF5 Files (*.h5 *.hdf5);;PySimSAR Archive (*.pysimsar);;All Files (*)",
+        )
+        if not filepath:
+            return
+
+        try:
+            fp = Path(filepath)
+            if fp.suffix == ".pysimsar":
+                import tempfile
+                import json
+                tmpdir = tempfile.mkdtemp(prefix="pysimsar_")
+                unpack_project(fp, tmpdir)
+                # Load parameters if available
+                params_path = Path(tmpdir) / "parameters.json"
+                if params_path.exists():
+                    with open(params_path, "r", encoding="utf-8") as f:
+                        params = json.load(f)
+                    # Convert swath_range from list to tuple
+                    sim = params.get("simulation", {})
+                    if "swath_range" in sim and isinstance(sim["swath_range"], list):
+                        sim["swath_range"] = tuple(sim["swath_range"])
+                    self._param_tree.set_all_parameters(params)
+                # Load HDF5 data if present
+                h5_path = Path(tmpdir) / "project.h5"
+                if h5_path.exists():
+                    model = ProjectModel()
+                    model.import_from_hdf5(str(h5_path))
+                    self._model = model
+            else:
+                model = ProjectModel()
+                model.import_from_hdf5(filepath)
+                self._model = model
+
+            self.statusBar().showMessage(f"Opened: {fp.name}")
+            self._update_scene_preview()
+            self._update_calc_panel()
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Open Error",
+                f"Failed to open project:\n{exc}",
+            )
+
+    def _on_preferences(self) -> None:
+        """Open the preferences dialog."""
+        dlg = PreferencesDialog(self._preferences, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._preferences.update(dlg.get_preferences())
+            self._user_data.save_preferences(self._preferences)
+            self.statusBar().showMessage("Preferences saved.")
+
+    def _on_preset_browser(self) -> None:
+        """Open the preset browser dialog."""
+        dlg = PresetBrowserDialog(self)
+        dlg.preset_applied.connect(self._on_preset_applied)
+        dlg.exec()
+
+    def _on_preset_applied(self, params: dict) -> None:
+        """Apply a preset to the parameter tree."""
+        self._param_tree.set_all_parameters(params)
+        self._update_scene_preview()
+        self._update_calc_panel()
+        self.statusBar().showMessage("Preset applied.")
 
 
 # ======================================================================
@@ -624,10 +876,7 @@ class MainWindow(QMainWindow):
 
 
 def launch() -> MainWindow:
-    """Create the QApplication (if needed) and show the MainWindow.
-
-    Returns the MainWindow instance for programmatic access.
-    """
+    """Create the QApplication (if needed) and show the MainWindow."""
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)

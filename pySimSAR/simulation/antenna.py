@@ -18,7 +18,7 @@ import math
 import numpy as np
 
 from pySimSAR.core.radar import Radar
-from pySimSAR.core.types import LookSide, SARMode
+from pySimSAR.core.types import LookSide, SARMode, SARModeConfig
 
 
 def compute_look_angles(
@@ -229,6 +229,7 @@ def compute_beam_direction(
     scene_center: np.ndarray | None = None,
     n_subswaths: int | None = None,
     burst_length: int | None = None,
+    sar_mode_config: SARModeConfig | None = None,
 ) -> tuple[float, float]:
     """Compute beam pointing direction for a given pulse.
 
@@ -237,8 +238,7 @@ def compute_beam_direction(
     Parameters
     ----------
     radar : Radar
-        Radar system model.  ``radar.mode`` determines which implementation
-        is used.
+        Radar system model.
     platform_pos : np.ndarray
         Platform ENU position [x, y, z] in metres, shape (3,).
     platform_vel : np.ndarray
@@ -246,14 +246,14 @@ def compute_beam_direction(
     pulse_idx : int
         Zero-based pulse index.
     scene_center : np.ndarray | None
-        ENU position of the spotlight scene center, shape (3,).
-        Required for SARMode.SPOTLIGHT; ignored otherwise.
+        (Deprecated) Use sar_mode_config instead.
     n_subswaths : int | None
-        Number of ScanSAR sub-swaths.  Required for SARMode.SCANMAR;
-        defaults to 3 if not provided.
+        (Deprecated) Use sar_mode_config instead.
     burst_length : int | None
-        Number of pulses per ScanSAR burst.  Required for SARMode.SCANMAR;
-        defaults to 1 if not provided.
+        (Deprecated) Use sar_mode_config instead.
+    sar_mode_config : SARModeConfig | None
+        SAR imaging config. If provided, overrides the individual kwargs
+        and ``radar.mode`` for dispatch.
 
     Returns
     -------
@@ -271,20 +271,27 @@ def compute_beam_direction(
     platform_pos = np.asarray(platform_pos, dtype=float)
     platform_vel = np.asarray(platform_vel, dtype=float)
 
-    if radar.mode == SARMode.STRIPMAP:
+    # Resolve config: explicit > radar's config > individual kwargs
+    cfg = sar_mode_config or radar.sar_mode_config
+    mode = cfg.mode
+    _scene_center = cfg.scene_center if sar_mode_config is not None else scene_center
+    _n_sub = cfg.n_subswaths if sar_mode_config is not None else n_subswaths
+    _burst = cfg.burst_length if sar_mode_config is not None else burst_length
+
+    if mode == SARMode.STRIPMAP:
         return _stripmap_beam(radar, platform_pos, platform_vel)
 
-    if radar.mode == SARMode.SPOTLIGHT:
-        if scene_center is None:
+    if mode == SARMode.SPOTLIGHT:
+        if _scene_center is None:
             raise ValueError(
                 "scene_center must be provided for SARMode.SPOTLIGHT"
             )
-        scene_center = np.asarray(scene_center, dtype=float)
-        return _spotlight_beam(radar, platform_pos, platform_vel, scene_center)
+        _scene_center = np.asarray(_scene_center, dtype=float)
+        return _spotlight_beam(radar, platform_pos, platform_vel, _scene_center)
 
-    if radar.mode == SARMode.SCANMAR:
-        _n = int(n_subswaths) if n_subswaths is not None else 3
-        _b = int(burst_length) if burst_length is not None else 1
+    if mode == SARMode.SCANMAR:
+        _n = int(_n_sub) if _n_sub is not None else 3
+        _b = int(_burst) if _burst is not None else 1
         if _n < 1:
             raise ValueError(f"n_subswaths must be >= 1, got {_n}")
         if _b < 1:
@@ -293,7 +300,7 @@ def compute_beam_direction(
             radar, platform_pos, platform_vel, pulse_idx, _n, _b
         )
 
-    raise ValueError(f"Unknown SAR mode: {radar.mode}")
+    raise ValueError(f"Unknown SAR mode: {mode}")
 
 
 def compute_two_way_gain(

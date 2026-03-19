@@ -68,9 +68,9 @@ def simulate_and_image():
         scene.add_target(PointTarget(position=[pos_x, pos_y, pos_z], rcs=rcs))
 
     # --- Radar ---
-    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
+    wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
     radar = Radar(
-        carrier_freq=9.65e9, prf=1000.0, transmit_power=1000.0,
+        carrier_freq=9.65e9, transmit_power=1000.0,
         waveform=wf, antenna=antenna, polarization="single",
         mode="stripmap", look_side="right", depression_angle=0.0,
         noise_figure=3.0,
@@ -80,7 +80,7 @@ def simulate_and_image():
     # --- Platform ---
     V = 100.0
     n_pulses = 512
-    aperture_length = V * n_pulses / radar.prf
+    aperture_length = V * n_pulses / radar.waveform.prf
     y_start = -aperture_length / 2.0
 
     print(f"Simulating {len(target_specs)} targets, {n_pulses} pulses...")
@@ -97,7 +97,7 @@ def simulate_and_image():
     raw_data = RawData(
         echo=echo, channel="single", sample_rate=sample_rate,
         carrier_freq=radar.carrier_freq, bandwidth=radar.bandwidth,
-        prf=radar.prf, waveform_name="lfm", sar_mode="stripmap",
+        prf=radar.waveform.prf, waveform_name="lfm", sar_mode="stripmap",
     )
     trajectory = Trajectory(
         time=result.pulse_times, position=result.positions,
@@ -121,7 +121,7 @@ def simulate_and_image():
               f"({20*np.log10(np.max(mag)/np.median(mag)):.0f} dB)")
 
     pixel_spacing_range = C_LIGHT / (2.0 * radar.bandwidth)
-    pixel_spacing_azimuth = V / radar.prf
+    pixel_spacing_azimuth = V / radar.waveform.prf
 
     # Cache results
     np.savez_compressed(
