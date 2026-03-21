@@ -16,6 +16,9 @@ build/
 demos/*.png
 tests/golden/**/*.png
 
+# MkDocs build output
+site/
+
 # IDE / OS
 .vscode/
 .idea/

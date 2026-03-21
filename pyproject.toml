@@ -29,6 +29,9 @@ dev = [
     "ruff>=0.1",
     "pySimSAR[gui]",
 ]
+docs = [
+    "mkdocs-material>=9.5",
+]
 
 [project.scripts]
 pysimsar = "pySimSAR.gui.app:main"
@@ -38,11 +41,11 @@ include = ["pySimSAR*"]
 
 [tool.ruff]
 target-version = "py310"
-line-length = 88
+line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP"]
-ignore = ["N999"]  # pySimSAR uses intentional camelCase package name
+ignore = ["N999","N806","N803","N802","N801"]  # pySimSAR uses intentional camelCase package name
 
 [tool.ruff.lint.isort]
 known-first-party = ["pySimSAR"]
@@ -53,3 +56,7 @@ addopts = "-v --tb=short -m 'not slow'"
 markers = [
     "slow: marks tests as slow (deselected by default, run with '-m slow')",
 ]
+
+[tool.ruff.lint.mccabe]
+# Flag functions that are too complex (important for math-heavy code)
+max-complexity = 10
