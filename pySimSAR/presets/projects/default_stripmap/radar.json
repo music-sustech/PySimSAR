@@ -1,12 +1,11 @@
 {
   "carrier_freq_hz": 9650000000.0,
-  "transmit_power_w": 1000.0,
+  "transmit_power_w": 1.0,
   "receiver_gain_dB": 30.0,
   "noise_figure_dB": 3.0,
   "system_losses_dB": 2.0,
   "reference_temp_K": 290.0,
   "polarization": "single",
-  "squint_angle_deg": 0.0,
   "waveform": {
     "$ref": "waveform.json"
   },

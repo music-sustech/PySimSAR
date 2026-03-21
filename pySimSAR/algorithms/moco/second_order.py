@@ -5,10 +5,10 @@ accounts for the variation of the motion-induced phase error across
 different range bins.
 
 Algorithm:
-    1. First-order: bulk phase correction per pulse (scene center reference)
+    1. First-order: bulk phase correction per pulse (fitted straight-line ref)
     2. Residual: for each range bin R, correct the residual phase error
        arising from the quadratic approximation of the path difference:
-           dR_residual(n, R) ≈ (dp_perp^2) * (1/(2R) - 1/(2R_ref))
+           dR_residual(n, R) ~ (dp_perp^2) * (1/(2R) - 1/(2R_ref))
        where dp_perp is the cross-track + vertical deviation magnitude.
 """
 
@@ -20,7 +20,6 @@ from pySimSAR.algorithms.base import MotionCompensationAlgorithm
 from pySimSAR.algorithms.moco.first_order import FirstOrderMoCo
 from pySimSAR.core.radar import C_LIGHT
 from pySimSAR.core.types import RawData
-from pySimSAR.motion.trajectory import Trajectory
 from pySimSAR.sensors.nav_data import NavigationData
 
 
@@ -34,7 +33,8 @@ class SecondOrderMoCo(MotionCompensationAlgorithm):
     ----------
     scene_center : np.ndarray | None
         Reference ground point, shape (3,). Passed through to
-        FirstOrderMoCo. If None, auto-estimated from trajectory.
+        FirstOrderMoCo. If None, auto-estimated from the fitted
+        straight-line reference.
     """
 
     name = "second_order"
@@ -54,7 +54,7 @@ class SecondOrderMoCo(MotionCompensationAlgorithm):
         self,
         raw_data: RawData,
         nav_data: NavigationData,
-        reference_track: Trajectory,
+        reference_track=None,
     ) -> RawData:
         """Apply second-order motion compensation.
 
@@ -64,8 +64,8 @@ class SecondOrderMoCo(MotionCompensationAlgorithm):
             Raw echo data, shape (n_azimuth, n_range).
         nav_data : NavigationData
             Navigation sensor measurements.
-        reference_track : Trajectory
-            Reference (ideal) trajectory.
+        reference_track : ignored
+            Not used. Kept for interface compatibility.
 
         Returns
         -------
@@ -74,26 +74,22 @@ class SecondOrderMoCo(MotionCompensationAlgorithm):
         """
         # Step 1: Apply first-order (bulk) correction
         first_order = FirstOrderMoCo(scene_center=self._scene_center)
-        compensated_1st = first_order.compensate(raw_data, nav_data, reference_track)
+        compensated_1st = first_order.compensate(raw_data, nav_data)
 
         # Step 2: Range-dependent residual correction
         echo = compensated_1st.echo.copy()
         n_az, n_rg = echo.shape
         wavelength = C_LIGHT / raw_data.carrier_freq
 
-        # Get aligned positions
-        ref_pos, nav_pos = first_order._align_positions(
-            n_az, raw_data.prf, nav_data, reference_track
+        # Get positions
+        nav_pos = first_order._align_nav_positions(
+            n_az, raw_data.prf, nav_data
         )
+        ref_pos = first_order._fit_straight_line(nav_pos)
 
-        # Get reference velocities
-        if len(reference_track) == n_az:
-            ref_vel = reference_track.velocity
-        else:
-            pulse_times = np.arange(n_az) / raw_data.prf
-            ref_vel = np.column_stack(
-                [reference_track.interpolate_velocity(t) for t in pulse_times]
-            ).T
+        # Reference velocities
+        dt = 1.0 / raw_data.prf
+        ref_vel = np.gradient(ref_pos, dt, axis=0)
 
         # Determine scene center (same as first-order used)
         if self._scene_center is not None:
@@ -101,7 +97,7 @@ class SecondOrderMoCo(MotionCompensationAlgorithm):
         else:
             scene_center = FirstOrderMoCo._estimate_scene_center(ref_pos, ref_vel)
 
-        # Reference slant range (from ideal trajectory to scene center)
+        # Reference slant range (from fitted ref to scene center)
         R_ref = np.linalg.norm(scene_center - ref_pos, axis=1)  # (n_az,)
 
         # Position deviation
@@ -129,7 +125,6 @@ class SecondOrderMoCo(MotionCompensationAlgorithm):
 
         # Range bin slant ranges (approximate)
         range_bin_spacing = C_LIGHT / (2.0 * raw_data.sample_rate)
-        # Near range estimate: use reference slant range minus half swath
         R_ref_mean = np.mean(R_ref)
         half_swath = n_rg * range_bin_spacing / 2.0
         R_near = max(R_ref_mean - half_swath, R_ref_mean * 0.5)
@@ -159,6 +154,7 @@ class SecondOrderMoCo(MotionCompensationAlgorithm):
             prf=raw_data.prf,
             waveform_name=raw_data.waveform_name,
             sar_mode=raw_data.sar_mode,
+            gate_delay=raw_data.gate_delay,
         )
 
 

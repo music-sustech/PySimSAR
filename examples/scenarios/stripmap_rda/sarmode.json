@@ -1,0 +1,9 @@
+{
+  "mode": "stripmap",
+  "look_side": "right",
+  "depression_angle_deg": 45.0,
+  "squint_angle_deg": 0.0,
+  "scene_center_m": null,
+  "n_subswaths": 3,
+  "burst_length": 20
+}

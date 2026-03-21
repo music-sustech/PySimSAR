@@ -127,7 +127,9 @@ class TestFreemanDurdenDecomposition:
 
     def test_three_components_returned(self):
         """Returns surface, double_bounce, volume components."""
-        from pySimSAR.algorithms.polarimetry.freeman_durden import FreemanDurdenDecomposition
+        from pySimSAR.algorithms.polarimetry.freeman_durden import (
+            FreemanDurdenDecomposition,
+        )
 
         img_hh, img_hv, img_vh, img_vv = _uniform_scene(1.0, 0.1, 0.1, 0.8)
         fd = FreemanDurdenDecomposition()
@@ -140,7 +142,9 @@ class TestFreemanDurdenDecomposition:
 
     def test_power_conservation(self):
         """All components non-negative; total power is finite and reasonable."""
-        from pySimSAR.algorithms.polarimetry.freeman_durden import FreemanDurdenDecomposition
+        from pySimSAR.algorithms.polarimetry.freeman_durden import (
+            FreemanDurdenDecomposition,
+        )
 
         rng = np.random.default_rng(42)
         size = (16, 16)
@@ -168,7 +172,9 @@ class TestFreemanDurdenDecomposition:
 
     def test_pure_cross_pol_gives_volume(self):
         """Strong cross-pol with weak co-pol → volume dominates."""
-        from pySimSAR.algorithms.polarimetry.freeman_durden import FreemanDurdenDecomposition
+        from pySimSAR.algorithms.polarimetry.freeman_durden import (
+            FreemanDurdenDecomposition,
+        )
 
         img_hh, img_hv, img_vh, img_vv = _uniform_scene(0.1, 1.0, 1.0, 0.1)
         fd = FreemanDurdenDecomposition()
@@ -179,11 +185,15 @@ class TestFreemanDurdenDecomposition:
         assert np.mean(result["volume"]) > np.mean(result["double_bounce"])
 
     def test_n_components(self):
-        from pySimSAR.algorithms.polarimetry.freeman_durden import FreemanDurdenDecomposition
+        from pySimSAR.algorithms.polarimetry.freeman_durden import (
+            FreemanDurdenDecomposition,
+        )
         assert FreemanDurdenDecomposition().n_components == 3
 
     def test_name(self):
-        from pySimSAR.algorithms.polarimetry.freeman_durden import FreemanDurdenDecomposition
+        from pySimSAR.algorithms.polarimetry.freeman_durden import (
+            FreemanDurdenDecomposition,
+        )
         assert FreemanDurdenDecomposition().name == "freeman_durden"
 
 
@@ -257,7 +267,9 @@ class TestCloudePottierDecomposition:
 
     def test_three_components_returned(self):
         """Returns entropy, anisotropy, alpha components."""
-        from pySimSAR.algorithms.polarimetry.cloude_pottier import CloudePottierDecomposition
+        from pySimSAR.algorithms.polarimetry.cloude_pottier import (
+            CloudePottierDecomposition,
+        )
 
         img_hh, img_hv, img_vh, img_vv = _uniform_scene(1.0, 0.1, 0.1, 0.8)
         cp = CloudePottierDecomposition()
@@ -269,7 +281,9 @@ class TestCloudePottierDecomposition:
 
     def test_single_mechanism_low_entropy(self):
         """Pure surface scattering (single mechanism) → low entropy."""
-        from pySimSAR.algorithms.polarimetry.cloude_pottier import CloudePottierDecomposition
+        from pySimSAR.algorithms.polarimetry.cloude_pottier import (
+            CloudePottierDecomposition,
+        )
 
         # Pure surface: S = [1,0;0,1] — single dominant mechanism
         img_hh, img_hv, img_vh, img_vv = _uniform_scene(1.0, 0.0, 0.0, 1.0)
@@ -281,7 +295,9 @@ class TestCloudePottierDecomposition:
 
     def test_random_scattering_high_entropy(self):
         """Random scattering → high entropy (multiple mechanisms)."""
-        from pySimSAR.algorithms.polarimetry.cloude_pottier import CloudePottierDecomposition
+        from pySimSAR.algorithms.polarimetry.cloude_pottier import (
+            CloudePottierDecomposition,
+        )
 
         # Random scattering with equal power in all channels
         rng = np.random.default_rng(42)
@@ -301,7 +317,9 @@ class TestCloudePottierDecomposition:
 
     def test_entropy_in_range(self):
         """Entropy should be in [0, 1]."""
-        from pySimSAR.algorithms.polarimetry.cloude_pottier import CloudePottierDecomposition
+        from pySimSAR.algorithms.polarimetry.cloude_pottier import (
+            CloudePottierDecomposition,
+        )
 
         rng = np.random.default_rng(42)
         size = (16, 16)
@@ -319,7 +337,9 @@ class TestCloudePottierDecomposition:
 
     def test_alpha_in_range(self):
         """Alpha angle should be in [0, pi/2]."""
-        from pySimSAR.algorithms.polarimetry.cloude_pottier import CloudePottierDecomposition
+        from pySimSAR.algorithms.polarimetry.cloude_pottier import (
+            CloudePottierDecomposition,
+        )
 
         rng = np.random.default_rng(42)
         size = (16, 16)
@@ -337,7 +357,9 @@ class TestCloudePottierDecomposition:
 
     def test_anisotropy_in_range(self):
         """Anisotropy should be in [0, 1]."""
-        from pySimSAR.algorithms.polarimetry.cloude_pottier import CloudePottierDecomposition
+        from pySimSAR.algorithms.polarimetry.cloude_pottier import (
+            CloudePottierDecomposition,
+        )
 
         rng = np.random.default_rng(42)
         size = (16, 16)
@@ -354,11 +376,15 @@ class TestCloudePottierDecomposition:
         assert np.all(result["anisotropy"] <= 1.0 + 1e-10)
 
     def test_n_components(self):
-        from pySimSAR.algorithms.polarimetry.cloude_pottier import CloudePottierDecomposition
+        from pySimSAR.algorithms.polarimetry.cloude_pottier import (
+            CloudePottierDecomposition,
+        )
         assert CloudePottierDecomposition().n_components == 3
 
     def test_name(self):
-        from pySimSAR.algorithms.polarimetry.cloude_pottier import CloudePottierDecomposition
+        from pySimSAR.algorithms.polarimetry.cloude_pottier import (
+            CloudePottierDecomposition,
+        )
         assert CloudePottierDecomposition().name == "cloude_pottier"
 
 

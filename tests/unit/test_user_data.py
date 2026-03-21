@@ -1,8 +1,7 @@
-import json
-from pathlib import Path
-from unittest.mock import patch
 import pytest
+
 from pySimSAR.io.user_data import UserDataDir
+
 
 @pytest.fixture
 def user_dir(tmp_path):

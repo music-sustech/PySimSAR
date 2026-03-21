@@ -1,10 +1,16 @@
 """Tiled/split visualization panel manager."""
 from __future__ import annotations
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QComboBox, QHBoxLayout, QSplitter, QTabWidget,
-    QToolButton, QVBoxLayout, QWidget,
+    QHBoxLayout,
+    QSplitter,
+    QTabWidget,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
 )
+
 
 class TiledViewManager(QWidget):
     """Manages tiled visualization with split support.

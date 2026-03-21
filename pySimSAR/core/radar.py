@@ -38,16 +38,16 @@ class AntennaPattern:
     el_angles : np.ndarray | None
         Elevation angle samples in radians. Required when *pattern_2d*
         is an array.
-    peak_gain_dB : float
-        Peak antenna gain in dB.
     """
+
+    # Aperture efficiency used for gain computation
+    _EFFICIENCY: float = 0.6
 
     def __init__(
         self,
         pattern_2d: np.ndarray | Callable[..., float],
         az_beamwidth: float,
         el_beamwidth: float,
-        peak_gain_dB: float,
         az_angles: np.ndarray | None = None,
         el_angles: np.ndarray | None = None,
     ) -> None:
@@ -59,9 +59,13 @@ class AntennaPattern:
         self.pattern_2d = pattern_2d
         self.az_beamwidth = az_beamwidth
         self.el_beamwidth = el_beamwidth
-        self.peak_gain_dB = peak_gain_dB
         self.az_angles = az_angles
         self.el_angles = el_angles
+
+        # Derived peak gain: G = 4*pi*eta / (theta_az * theta_el)
+        self._peak_gain_dB: float = 10.0 * math.log10(
+            4.0 * math.pi * self._EFFICIENCY / (az_beamwidth * el_beamwidth)
+        )
 
         # Build interpolator for array patterns
         self._interpolator: Callable[..., float] | None = None
@@ -85,6 +89,11 @@ class AntennaPattern:
                 bounds_error=False,
                 fill_value=float(np.min(pattern_2d)),
             )
+
+    @property
+    def peak_gain_dB(self) -> float:  # noqa: N802
+        """Peak antenna gain in dB (derived from beamwidths)."""
+        return self._peak_gain_dB
 
     def gain(self, az: float, el: float) -> float:
         """Evaluate antenna gain at the given angles.
@@ -149,6 +158,7 @@ class Radar:
         Reference temperature in Kelvin (> 0, default 290.0).
     squint_angle : float
         Squint angle in radians [-pi/2, pi/2] (default 0.0).
+        Delegated to sar_mode_config since it describes imaging geometry.
     """
 
     def __init__(
@@ -204,7 +214,6 @@ class Radar:
         self.sample_rate = sample_rate
         self.waveform = waveform
         self.antenna = antenna
-        self.squint_angle = squint_angle
 
         # Coerce string values to enums
         self.polarization = _coerce_enum(polarization, PolarizationMode)
@@ -212,6 +221,9 @@ class Radar:
         # Build or accept SARModeConfig
         if sar_mode_config is not None:
             self._sar_mode_config = sar_mode_config
+            # If squint_angle passed explicitly and differs from config, update config
+            if squint_angle != 0.0 and sar_mode_config.squint_angle == 0.0:
+                self._sar_mode_config.squint_angle = squint_angle
         else:
             _mode = _coerce_enum(mode, SARMode)
             _look = _coerce_enum(look_side, LookSide)
@@ -223,6 +235,7 @@ class Radar:
                 mode=_mode,
                 look_side=_look,
                 depression_angle=depression_angle,
+                squint_angle=squint_angle,
             )
 
         # Warn if waveform duration exceeds PRI
@@ -254,6 +267,11 @@ class Radar:
     def depression_angle(self) -> float:
         """Depression angle in radians (delegated to sar_mode_config)."""
         return self._sar_mode_config.depression_angle
+
+    @property
+    def squint_angle(self) -> float:
+        """Squint angle in radians (delegated to sar_mode_config)."""
+        return self._sar_mode_config.squint_angle
 
     @property
     def bandwidth(self) -> float:
@@ -290,7 +308,6 @@ def create_antenna_from_preset(
     preset: str,
     az_beamwidth: float,
     el_beamwidth: float,
-    peak_gain_dB: float,
 ) -> AntennaPattern:
     """Create an AntennaPattern from a named preset.
 
@@ -302,8 +319,6 @@ def create_antenna_from_preset(
         3 dB azimuth beamwidth in radians.
     el_beamwidth : float
         3 dB elevation beamwidth in radians.
-    peak_gain_dB : float
-        Peak antenna gain in dB.
 
     Returns
     -------
@@ -312,6 +327,12 @@ def create_antenna_from_preset(
     """
     preset = preset.lower()
     floor_dB = -60.0
+
+    # Compute peak gain locally for use in pattern closures
+    eta = AntennaPattern._EFFICIENCY
+    peak_gain_dB = 10.0 * math.log10(
+        4.0 * math.pi * eta / (az_beamwidth * el_beamwidth)
+    )
 
     if preset == "flat":
         half_az = az_beamwidth / 2.0
@@ -326,7 +347,6 @@ def create_antenna_from_preset(
             pattern_2d=flat_pattern,
             az_beamwidth=az_beamwidth,
             el_beamwidth=el_beamwidth,
-            peak_gain_dB=peak_gain_dB,
         )
 
     elif preset == "sinc":
@@ -342,7 +362,6 @@ def create_antenna_from_preset(
             pattern_2d=sinc_pattern,
             az_beamwidth=az_beamwidth,
             el_beamwidth=el_beamwidth,
-            peak_gain_dB=peak_gain_dB,
         )
 
     elif preset == "gaussian":
@@ -354,7 +373,6 @@ def create_antenna_from_preset(
             pattern_2d=gaussian_pattern,
             az_beamwidth=az_beamwidth,
             el_beamwidth=el_beamwidth,
-            peak_gain_dB=peak_gain_dB,
         )
 
     else:

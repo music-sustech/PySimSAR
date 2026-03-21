@@ -47,7 +47,7 @@
 
 ## Phase 3: User Story 1 — Tree-Based Parameter Navigation (Priority: P1) MVP
 
-**Goal**: Replace the flat sidebar with a hierarchical inline-editing parameter tree (Cadence Virtuoso style). All existing parameters accessible. SAR mode disables irrelevant params. Search/filter. Category icons.
+**Goal**: Replace the flat sidebar with a hierarchical inline-editing parameter tree (Cadence Virtuoso style). All existing parameters accessible. SAR mode disables irrelevant params. Search/filter.
 
 **Independent Test**: Launch GUI, verify every parameter from old sidebar is reachable in tree, edit values inline, expand/collapse categories, search by keyword.
 
@@ -58,12 +58,12 @@
 
 ### Implementation for User Story 1
 
-- [X] T015 [US1] Create `pySimSAR/gui/widgets/param_tree.py` — implement `ParameterTreeWidget(QTreeWidget)` with: 2-column layout (Parameter Name | Value Widget), `setItemWidget()` for inline editors (reuse UnitSpinBox, _CleanDoubleSpinBox, _no_scroll_unless_focused from param_editor.py), 7 top-level category nodes with icons, expandable sub-groups, `parameter_changed(key, value)` signal, `get_all_parameters()` and `set_all_parameters(params)` methods. Per contracts/parameter-tree.md.
+- [X] T015 [US1] Create `pySimSAR/gui/widgets/param_tree.py` — implement `ParameterTreeWidget(QTreeWidget)` with: 2-column layout (Parameter Name | Value Widget), `setItemWidget()` for inline editors (reuse UnitSpinBox, _CleanDoubleSpinBox, _no_scroll_unless_focused from param_editor.py), 7 top-level category nodes (bold text, no icons), expandable sub-groups, `parameter_changed(key, value)` signal, `get_all_parameters()` and `set_all_parameters(params)` methods. Per contracts/parameter-tree.md.
 - [X] T016 [US1] Populate the parameter tree with all current parameters — map every field from RadarParamEditor, AntennaParamEditor, WaveformParamEditor, PlatformParamEditor, SceneParamEditor, SimulationParamEditor into tree nodes. Include conditional visibility (FMCW ramp_type, phase noise sub-params, turbulence, GPS, IMU).
 - [X] T017 [US1] Implement flight path input modes in the Platform section of the tree — add mode selector (start-stop / heading-time), conditionally show/hide stop_position vs heading+velocity+flight_time fields. Remove n_pulses from editable params (now derived). Wire to flight_path.py helper.
 - [X] T018 [US1] Implement SAR mode constraint logic in param_tree.py — when mode dropdown changes, call `set_mode_constraints(mode)` to disable/enable mode-irrelevant parameters (scene_center, n_subswaths, burst_length) with explanatory tooltips.
 - [X] T019 [US1] Implement search/filter in param_tree.py — add QLineEdit above tree, filter by recursive item hiding (case-insensitive match on parameter name), show parent if any child matches.
-- [ ] T020 [US1] Add category icons — create or source 7 SVG/PNG icons for Radar, Antenna, Waveform, Platform, Scene, Simulation, Processing. Store in `pySimSAR/assets/icons/`. Set via `QTreeWidgetItem.setIcon()`.
+- [X] T020 [US1] ~~Add category icons~~ — REMOVED: category icons dropped from scope per user request. Section headings use bold text only.
 - [X] T021 [US1] Restructure main window layout in `pySimSAR/gui/app.py` — replace current flat sidebar + tab area with: left panel = ParameterTreeWidget (scrollable), right panel = visualization tabs (top) + calculated values placeholder (bottom), full-width status bar at bottom. Use nested QSplitters. Remove old param editor imports and sidebar construction.
 - [X] T022 [US1] Wire parameter tree to simulation controller in `pySimSAR/gui/app.py` — connect `parameter_changed` signal to model update, connect Run action to `get_all_parameters()` → build ProjectModel, connect project load to `set_all_parameters()`. Preserve live scene preview on param change.
 
@@ -85,7 +85,7 @@
 
 - [X] T024 [US2] Create `pySimSAR/gui/widgets/calc_panel.py` — implement `CalculatedValuesPanel(QWidget)` displaying a scrollable grid of Name | Value | Unit rows, grouped by category (Radar, Geometry, Performance, Flight). Warning icon (yellow/red) on flagged values. `update(params: dict)` method calls `SARCalculator.compute()`.
 - [X] T025 [US2] Integrate calc panel into main window layout in `pySimSAR/gui/app.py` — place in bottom-right (below viz tabs, above status bar). Connect `parameter_changed` signal from tree to `calc_panel.update()`.
-- [X] T026 [US2] Create 3 golden test configurations in `tests/golden/calculated_values/` — X-band airborne stripmap, C-band spaceborne, W-band UAV FMCW — each with hand-calculated expected values for all 15 quantities. Verify SARCalculator matches within tolerance.
+- [X] T026 [US2] Create 3 golden test configurations in `examples/golden/calculated_values/` — X-band airborne stripmap, C-band spaceborne, W-band UAV FMCW — each with hand-calculated expected values for all 15 quantities. Verify SARCalculator matches within tolerance.
 
 **Checkpoint**: Calculated values panel live-updates on parameter change, correct formulas, warnings visible.
 

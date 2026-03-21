@@ -1,0 +1,8 @@
+{
+  "image_formation": {
+    "algorithm": "range_doppler",
+    "params": {}
+  },
+  "moco": null,
+  "autofocus": null
+}

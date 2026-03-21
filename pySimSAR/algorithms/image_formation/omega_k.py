@@ -26,6 +26,7 @@ from __future__ import annotations
 import numpy as np
 
 from pySimSAR.algorithms.base import ImageFormationAlgorithm
+from pySimSAR.algorithms.image_formation._rcmc_interp import sinc_interp
 from pySimSAR.core.radar import C_LIGHT
 from pySimSAR.core.types import PhaseHistoryData, SARImage, SARMode
 
@@ -44,8 +45,8 @@ class OmegaKAlgorithm(ImageFormationAlgorithm):
 
     name = "omega_k"
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, reference_range: float = 0.0) -> None:
+        self.reference_range = reference_range
 
     def supported_modes(self) -> list[SARMode]:
         return [SARMode.STRIPMAP, SARMode.SPOTLIGHT]
@@ -183,11 +184,7 @@ class OmegaKAlgorithm(ImageFormationAlgorithm):
             src_positions = abs_bins / D_k - near_range_bins
 
             row = data_rd[k, :]
-            data_corrected[k, :] = np.interp(
-                src_positions, range_bins, row.real
-            ) + 1j * np.interp(
-                src_positions, range_bins, row.imag
-            )
+            data_corrected[k, :] = sinc_interp(row, src_positions, 8)
 
         return data_corrected
 

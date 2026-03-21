@@ -1,12 +1,22 @@
 """Project creation wizard — guides users through SAR simulation setup."""
 from __future__ import annotations
+
 import math
+
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
-    QComboBox, QDoubleSpinBox, QFormLayout, QLabel, QLineEdit,
-    QSpinBox, QTextEdit, QVBoxLayout, QWizard, QWizardPage, QWidget,
+    QFormLayout,
+    QLineEdit,
+    QTextEdit,
+    QWizard,
+    QWizardPage,
 )
-from pySimSAR.gui.widgets.param_editor import UnitSpinBox, _plain_spin, _combo, _no_scroll_unless_focused
+
+from pySimSAR.gui.widgets.param_editor import (
+    UnitSpinBox,
+    _combo,
+    _plain_spin,
+)
 
 _FREQ = {"GHz": 1e9, "MHz": 1e6, "kHz": 1e3, "Hz": 1.0}
 _DIST = {"km": 1e3, "m": 1.0}
@@ -45,7 +55,7 @@ class RadarConfigPage(QWizardPage):
         form = QFormLayout(self)
         self._carrier_freq = UnitSpinBox(_FREQ, "GHz", value=9.65, minimum=0.001, maximum=999.0, step=0.01)
         self._prf = UnitSpinBox({"kHz": 1e3, "Hz": 1.0}, "Hz", value=1000.0, minimum=1.0, maximum=999999.0, step=100.0)
-        self._transmit_power = UnitSpinBox(_POWER, "W", value=1000.0, minimum=0.01, maximum=999999.0, step=100.0)
+        self._transmit_power = UnitSpinBox(_POWER, "W", value=1.0, minimum=0.01, maximum=999999.0, step=0.1)
         self._bandwidth = UnitSpinBox(_FREQ, "MHz", value=100.0, minimum=0.001, maximum=99999.0, step=1.0)
         self._depression = _plain_spin(45.0, 0.0, 90.0, 1.0, "°")
         form.addRow("Carrier Frequency:", self._carrier_freq)
@@ -187,7 +197,6 @@ class ProjectCreationWizard(QWizard):
                 "receiver_gain_dB": 30.0,
                 "system_losses": 2.0,
                 "noise_figure": 3.0,
-                "squint_angle": 0.0,
                 "reference_temp": 290.0,
                 "polarization": "single",
                 "mode": meta["mode"],
@@ -198,7 +207,6 @@ class ProjectCreationWizard(QWizard):
                 "preset": "flat",
                 "az_beamwidth": math.radians(10.0),
                 "el_beamwidth": math.radians(10.0),
-                "peak_gain_dB": 30.0,
             },
             "waveform": {
                 "waveform_type": "LFM",

@@ -1,0 +1,19 @@
+{
+  "format_version": "1.0",
+  "name": "Golden Case 2: Multi-Target Spotlight",
+  "description": "Multiple targets, spotlight mode, Hamming window, sinc antenna, Omega-K.",
+  "scene": { "$ref": "scene.json" },
+  "radar": { "$ref": "radar.json" },
+  "platform": { "$ref": "platform.json" },
+  "sarmode": { "$ref": "sarmode.json" },
+  "simulation": {
+    "seed": 42,
+    "sample_rate_hz": null,
+    "swath_range_m": [4000, 4500]
+  },
+  "processing": {
+    "image_formation": { "algorithm": "omega_k", "params": {} },
+    "moco": null,
+    "autofocus": null
+  }
+}

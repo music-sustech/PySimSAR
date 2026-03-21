@@ -13,10 +13,10 @@ from pySimSAR.algorithms.registry import AlgorithmRegistry
 polarimetry_registry = AlgorithmRegistry(PolarimetricDecomposition, "polarimetry")
 
 # Register default algorithms
-from pySimSAR.algorithms.polarimetry.pauli import PauliDecomposition
-from pySimSAR.algorithms.polarimetry.freeman_durden import FreemanDurdenDecomposition
-from pySimSAR.algorithms.polarimetry.yamaguchi import YamaguchiDecomposition
 from pySimSAR.algorithms.polarimetry.cloude_pottier import CloudePottierDecomposition
+from pySimSAR.algorithms.polarimetry.freeman_durden import FreemanDurdenDecomposition
+from pySimSAR.algorithms.polarimetry.pauli import PauliDecomposition
+from pySimSAR.algorithms.polarimetry.yamaguchi import YamaguchiDecomposition
 
 polarimetry_registry.register(PauliDecomposition)
 polarimetry_registry.register(FreemanDurdenDecomposition)

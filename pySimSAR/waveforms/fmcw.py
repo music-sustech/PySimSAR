@@ -116,7 +116,11 @@ class FMCWWaveform(Waveform):
     def range_compress(
         self, echo: np.ndarray, prf: float, sample_rate: float
     ) -> np.ndarray:
-        """Range-compress echo data via dechirp processing.
+        """Range-compress echo data via frequency-domain matched filtering.
+
+        Uses the same approach as LFM: conj(FFT(ref)) * FFT(echo) in the
+        frequency domain, which correctly handles echoes at any delay
+        regardless of waveform duration.
 
         Parameters
         ----------
@@ -141,30 +145,19 @@ class FMCWWaveform(Waveform):
 
         if echo.ndim == 1:
             n = len(echo)
-            # Zero-pad or truncate reference to match echo length
-            if len(ref) < n:
-                ref_padded = np.zeros(n, dtype=ref.dtype)
-                ref_padded[: len(ref)] = ref
-            else:
-                ref_padded = ref[:n]
-
-            beat = echo * np.conj(ref_padded)
+            ref_fft = np.conj(np.fft.fft(ref, n=n))
             if self.window is not None:
-                beat = beat * self.window(n)
-            return np.fft.fft(beat)
+                ref_fft = ref_fft * self.window(n)
+            return np.fft.ifft(np.fft.fft(echo, n=n) * ref_fft)
         elif echo.ndim == 2:
-            n_pulses, n_range = echo.shape
-            # Zero-pad or truncate reference
-            if len(ref) < n_range:
-                ref_padded = np.zeros(n_range, dtype=ref.dtype)
-                ref_padded[: len(ref)] = ref
-            else:
-                ref_padded = ref[:n_range]
-
-            beat = echo * np.conj(ref_padded)[np.newaxis, :]
+            n = echo.shape[1]
+            ref_fft = np.conj(np.fft.fft(ref, n=n))
             if self.window is not None:
-                beat = beat * self.window(n_range)[np.newaxis, :]
-            return np.fft.fft(beat, axis=1)
+                ref_fft = ref_fft * self.window(n)
+            return np.fft.ifft(
+                np.fft.fft(echo, n=n, axis=1) * ref_fft[np.newaxis, :],
+                axis=1,
+            )
         else:
             raise ValueError(f"echo must be 1D or 2D, got {echo.ndim}D")
 

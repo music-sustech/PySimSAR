@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import numpy as np
-from PyQt6.QtWidgets import QVBoxLayout, QWidget
 import pyqtgraph.opengl as gl
+from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from pySimSAR.core.scene import DistributedTarget, PointTarget, Scene
 

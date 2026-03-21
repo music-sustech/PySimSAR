@@ -1,0 +1,30 @@
+{
+  "velocity_mps": 100.0,
+  "altitude_m": 2000.0,
+  "heading_deg": 0.0,
+  "start_position_m": [0, -25.6, 2000],
+  "flight_path_mode": "heading_time",
+  "flight_time": 0.512,
+  "perturbation": {
+    "type": "dryden",
+    "sigma_u": 1.5,
+    "sigma_v": 1.5,
+    "sigma_w": 0.75
+  },
+  "sensors": [
+    {
+      "type": "gps",
+      "accuracy_rms_m": 1.0,
+      "update_rate_hz": 10.0,
+      "outage_intervals": [],
+      "error_model": { "type": "gaussian" }
+    },
+    {
+      "type": "imu",
+      "accel_noise_density": 0.003,
+      "gyro_noise_density": 0.0005,
+      "sample_rate_hz": 100.0,
+      "error_model": { "type": "white_noise" }
+    }
+  ]
+}

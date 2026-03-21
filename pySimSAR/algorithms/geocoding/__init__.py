@@ -11,8 +11,8 @@ from pySimSAR.algorithms.registry import AlgorithmRegistry
 geocoding_registry = AlgorithmRegistry(ImageTransformationAlgorithm, "geocoding")
 
 # Register default algorithms
-from pySimSAR.algorithms.geocoding.slant_to_ground import SlantToGroundRange
 from pySimSAR.algorithms.geocoding.georeferencing import Georeferencing
+from pySimSAR.algorithms.geocoding.slant_to_ground import SlantToGroundRange
 
 geocoding_registry.register(SlantToGroundRange)
 geocoding_registry.register(Georeferencing)

@@ -1,11 +1,19 @@
 """Data import wizard — HDF5 file import with preview and gap detection."""
 from __future__ import annotations
-from pathlib import Path
+
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
-    QFileDialog, QFormLayout, QLabel, QLineEdit, QPushButton,
-    QTextEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
-    QWizard, QWizardPage, QWidget,
+    QFileDialog,
+    QFormLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QTextEdit,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWizard,
+    QWizardPage,
 )
 
 

@@ -7,7 +7,7 @@ The parameter tree widget is the primary configuration interface. It replaces th
 ### Tree Structure
 
 ```
-Column 0: Parameter Name (with icon for categories)
+Column 0: Parameter Name (bold for categories)
 Column 1: Value Widget (inline editor)
 ```
 
@@ -15,7 +15,7 @@ Column 1: Value Widget (inline editor)
 
 | Type | Column 0 | Column 1 | Expandable |
 |------|----------|----------|------------|
-| CATEGORY | Icon + bold name | Empty | Yes |
+| CATEGORY | Bold name | Empty | Yes |
 | GROUP | Name | Empty | Yes |
 | PARAMETER | Name | Widget (spinbox/combo/checkbox) | No |
 | ALGORITHM_SELECTOR | Name | Dropdown | Yes (dynamic children) |

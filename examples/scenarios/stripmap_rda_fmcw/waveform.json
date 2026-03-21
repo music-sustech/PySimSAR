@@ -1,0 +1,8 @@
+{
+  "type": "fmcw",
+  "bandwidth_hz": 300000000.0,
+  "duty_cycle": 0.1,
+  "ramp_type": "up",
+  "window": null,
+  "phase_noise": null
+}

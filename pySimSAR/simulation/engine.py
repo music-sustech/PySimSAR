@@ -8,17 +8,21 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from typing import TYPE_CHECKING
-
-from pySimSAR.core.radar import C_LIGHT, K_BOLTZMANN, Radar
+from pySimSAR.core.radar import C_LIGHT, Radar
 from pySimSAR.core.scene import DistributedTarget, PointTarget, Scene
-from pySimSAR.core.types import PolarizationChannel, PolarizationMode, SARMode, SARModeConfig
+from pySimSAR.core.types import (
+    PolarizationChannel,
+    PolarizationMode,
+    SARModeConfig,
+)
 
 if TYPE_CHECKING:
     from pySimSAR.core.platform import Platform
+from pySimSAR.simulation._fast_echo import compute_point_echoes_batch
 from pySimSAR.simulation.antenna import (
     compute_beam_direction,
     compute_look_angles,
@@ -26,7 +30,6 @@ from pySimSAR.simulation.antenna import (
 )
 from pySimSAR.simulation.signal import (
     compute_distributed_target_echoes,
-    compute_target_echo,
 )
 
 
@@ -82,8 +85,8 @@ class SimulationResult:
         **kwargs
             Additional keyword arguments passed to write_hdf5.
         """
-        from pySimSAR.io.hdf5_format import write_hdf5
         from pySimSAR.core.types import RawData
+        from pySimSAR.io.hdf5_format import write_hdf5
 
         raw_data = {}
         for ch, echo in self.echo.items():
@@ -496,10 +499,40 @@ class SimulationEngine:
         for ch in channels:
             echoes[ch] = np.zeros((self.n_pulses, n_range), dtype=complex)
 
+        # Generate slow-time phase noise sequence (one scalar per pulse at PRF).
+        # Phase noise power is concentrated at low offset frequencies (Hz–kHz);
+        # generating at the PRF rate captures this correctly, unlike the old
+        # fast-time approach which only sampled frequencies above ~1 MHz.
+        slow_time_phase_noise: np.ndarray | None = None
+        if self.radar.waveform.phase_noise is not None:
+            slow_time_phase_noise = self.radar.waveform.phase_noise.generate(
+                self.n_pulses, self.radar.waveform.prf, seed=rng.integers(0, 2**31)
+            )
+
         # Platform trajectory arrays
         positions = np.zeros((self.n_pulses, 3))
         velocities = np.zeros((self.n_pulses, 3))
         pulse_times = np.zeros(self.n_pulses)
+
+        # Pre-extract point-target data for the batch kernel (once).
+        pt_targets = self.scene.point_targets
+        n_pt = len(pt_targets)
+        if n_pt > 0:
+            pt_positions = np.array([t.position for t in pt_targets], dtype=np.float64)
+            pt_velocities = np.zeros((n_pt, 3), dtype=np.float64)
+            pt_has_vel = np.zeros(n_pt, dtype=np.bool_)
+            for i, t in enumerate(pt_targets):
+                if t.velocity is not None:
+                    pt_velocities[i] = t.velocity
+                    pt_has_vel[i] = True
+
+            # RCS depends on channel but not on pulse — precompute per channel.
+            ch_rcs = {}
+            for ch in channels:
+                ch_rcs[ch] = np.array(
+                    [self._get_rcs_for_channel(t, ch) for t in pt_targets],
+                    dtype=np.float64,
+                )
 
         for pulse_idx in range(self.n_pulses):
             t = pulse_idx * pri
@@ -525,12 +558,10 @@ class SimulationEngine:
                 sar_mode_config=self._sar_mode_config,
             )
 
-            # Generate phase noise for this pulse (if waveform has it)
-            pulse_phase_noise = None
-            if self.radar.waveform.phase_noise is not None:
-                pulse_phase_noise = self.radar.waveform.phase_noise.generate(
-                    n_range, self.sample_rate, seed=rng.integers(0, 2**31)
-                )
+            # Slow-time phase noise: scalar phase error for this pulse
+            pulse_phase_noise_rad = 0.0
+            if slow_time_phase_noise is not None:
+                pulse_phase_noise_rad = slow_time_phase_noise[pulse_idx]
 
             # Two-way gain helper
             def _gain_func(target_pos: np.ndarray) -> float:
@@ -541,28 +572,36 @@ class SimulationEngine:
                     self.radar, tgt_az, tgt_el, steer_az, steer_el
                 )
 
+            # Pre-compute antenna gains for all point targets (once per
+            # pulse, shared across channels).
+            if n_pt > 0:
+                pt_gains = np.array(
+                    [_gain_func(pt_positions[i]) for i in range(n_pt)],
+                    dtype=np.float64,
+                )
+
             for ch in channels:
                 pulse_echo = np.zeros(n_range, dtype=complex)
 
-                # Point targets
-                for target in self.scene.point_targets:
-                    rcs = self._get_rcs_for_channel(target, ch)
-                    gain = _gain_func(target.position)
-
-                    pulse_echo += compute_target_echo(
-                        radar=self.radar,
+                # Point targets — batch kernel (Numba or vectorised NumPy)
+                if n_pt > 0:
+                    pulse_echo += compute_point_echoes_batch(
                         platform_pos=pos,
-                        platform_vel=vel,
-                        target_pos=target.position,
-                        target_rcs=rcs,
+                        target_positions=pt_positions,
+                        target_rcs=ch_rcs[ch],
+                        target_gains=pt_gains,
+                        carrier_freq=self.radar.carrier_freq,
+                        wavelength=self.radar.wavelength,
+                        transmit_power=self.radar.transmit_power,
+                        system_losses_dB=self.radar.system_losses,
+                        receiver_gain_dB=getattr(self.radar, "receiver_gain", 0.0),
                         sample_rate=self.sample_rate,
                         n_samples=n_range,
                         time=t,
-                        two_way_gain_linear=gain,
-                        target_velocity=target.velocity,
                         tx_signal=tx_signal,
-                        phase_noise=pulse_phase_noise,
                         gate_delay=gate_delay,
+                        target_velocities=pt_velocities,
+                        has_velocity=pt_has_vel,
                     )
 
                 # Distributed targets
@@ -583,9 +622,12 @@ class SimulationEngine:
                         time=t,
                         two_way_gain_func=_gain_func,
                         tx_signal=tx_signal,
-                        phase_noise=pulse_phase_noise,
                         gate_delay=gate_delay,
                     )
+
+                # Apply slow-time phase noise to entire pulse
+                if pulse_phase_noise_rad != 0.0:
+                    pulse_echo *= np.exp(1j * pulse_phase_noise_rad)
 
                 # Add receiver noise
                 pulse_echo += self._generate_receiver_noise(n_range, rng)

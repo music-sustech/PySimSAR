@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pyqtgraph.opengl as gl
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QHBoxLayout,
+    QLabel,
     QPushButton,
     QSlider,
-    QLabel,
     QVBoxLayout,
     QWidget,
 )

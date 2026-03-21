@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # T047: Platform unit tests
 # ---------------------------------------------------------------------------
@@ -67,8 +66,6 @@ class TestPlatform:
     def test_platform_sensor_attachment(self):
         """Can attach GPS and IMU sensors to platform."""
         from pySimSAR.core.platform import Platform
-        from pySimSAR.sensors.gps import GPSErrorModel
-        from pySimSAR.sensors.imu import IMUErrorModel
 
         p = Platform(velocity=100.0, altitude=2000.0)
         # Just verify the sensors list works (actual sensor classes tested later)

@@ -1,0 +1,979 @@
+{
+  "origin_lat_deg": 0.0,
+  "origin_lon_deg": 0.0,
+  "origin_alt_m": 0.0,
+  "point_targets": [
+    {
+      "position_m": [
+        700,
+        -5,
+        0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        700,
+        0,
+        0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        700,
+        5,
+        0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        936.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        952.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        936.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        940.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        948.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        952.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        936.0,
+        -4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        944.0,
+        -4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        952.0,
+        -4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        936.0,
+        0.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        952.0,
+        0.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        936.0,
+        4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        952.0,
+        4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        936.0,
+        8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        952.0,
+        8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        936.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        952.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        964.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        980.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        964.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        980.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        964.0,
+        -4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        980.0,
+        -4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        964.0,
+        0.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        980.0,
+        0.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        964.0,
+        4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        980.0,
+        4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        964.0,
+        8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        980.0,
+        8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        968.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        972.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        976.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        996.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1000.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1004.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        992.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1008.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        992.0,
+        -4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        996.0,
+        0.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1000.0,
+        0.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1004.0,
+        0.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1008.0,
+        4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        992.0,
+        8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1008.0,
+        8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        996.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1000.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1004.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1020.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1024.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1028.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1032.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1036.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1028.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1028.0,
+        -4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1028.0,
+        0.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1028.0,
+        4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1028.0,
+        8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1020.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1024.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1028.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1032.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1036.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1052.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1056.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1060.0,
+        -12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1048.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1064.0,
+        -8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1048.0,
+        -4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1048.0,
+        0.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1048.0,
+        4.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1048.0,
+        8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1064.0,
+        8.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1052.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1056.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1060.0,
+        12.0,
+        0.0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1428,
+        -5,
+        0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1428,
+        0,
+        0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    },
+    {
+      "position_m": [
+        1428,
+        5,
+        0
+      ],
+      "rcs_m2": 1.0,
+      "rcs_model": {
+        "type": "static"
+      },
+      "velocity_mps": null
+    }
+  ]
+}

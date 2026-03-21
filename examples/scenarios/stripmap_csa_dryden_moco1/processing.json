@@ -1,0 +1,11 @@
+{
+  "image_formation": {
+    "algorithm": "chirp_scaling",
+    "params": {}
+  },
+  "moco": {
+    "algorithm": "first_order",
+    "params": {}
+  },
+  "autofocus": null
+}

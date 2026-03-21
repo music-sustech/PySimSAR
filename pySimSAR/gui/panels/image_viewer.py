@@ -71,6 +71,7 @@ class ImageViewerPanel(QWidget):
         _no_scroll_unless_focused(self._cmap_combo)
 
         self._correct_aspect = QCheckBox("Corrected aspect")
+        self._correct_aspect.setChecked(True)
         self._correct_aspect.setToolTip(
             "Display with correct range/azimuth pixel spacing ratio"
         )
@@ -138,8 +139,8 @@ class ImageViewerPanel(QWidget):
             self._db_data = data.astype(float)
 
         self._refresh_display()
-        # Auto-zoom to target region on first display
-        self._zoom_to_target()
+        # Show full extent by default
+        self._zoom_full()
 
     def clear(self) -> None:
         """Remove the current image and reset the canvas."""
@@ -201,7 +202,7 @@ class ImageViewerPanel(QWidget):
             return
         r_min, r_max, a_min, a_max = region
         self._axes.set_xlim(r_min, r_max)
-        self._axes.set_ylim(a_max, a_min)  # inverted for image origin=upper
+        self._axes.set_ylim(a_min, a_max)  # azimuth increases top-to-bottom
         self._canvas.draw_idle()
 
     def _zoom_full(self) -> None:
@@ -209,6 +210,8 @@ class ImageViewerPanel(QWidget):
         if self._db_data is None:
             return
         self._axes.autoscale()
+        if not self._axes.yaxis_inverted():
+            self._axes.invert_yaxis()
         self._canvas.draw_idle()
 
     # ------------------------------------------------------------------
@@ -219,6 +222,16 @@ class ImageViewerPanel(QWidget):
         """Redraw the image using the current control settings."""
         if self._db_data is None:
             return
+
+        # Exit Find Peak mode before redraw (keeps marker data intact)
+        if self._btn_find_peak.isChecked():
+            self._btn_find_peak.setChecked(False)
+
+        # Save existing marker positions before clearing the figure
+        saved_peaks = [
+            (m.x, m.y, m.value) for m in self._peak_finder.markers
+        ]
+        self._peak_finder.clear_all_markers()
 
         # Save current zoom limits before clearing
         try:
@@ -247,12 +260,10 @@ class ImageViewerPanel(QWidget):
             azimuth_extent = n_az
             extent = [0, n_rng, n_az, 0]
 
-        # Aspect ratio
-        if self._correct_aspect.isChecked() and img is not None:
-            if img.pixel_spacing_range > 0 and img.pixel_spacing_azimuth > 0:
-                aspect = img.pixel_spacing_azimuth / img.pixel_spacing_range
-            else:
-                aspect = 1.0
+        # Aspect ratio: extent already maps pixels to physical metres,
+        # so "equal" gives true 1:1 scale; "auto" stretches to fill.
+        if self._correct_aspect.isChecked():
+            aspect = "equal"
         else:
             aspect = "auto"
 
@@ -278,7 +289,13 @@ class ImageViewerPanel(QWidget):
         # Restore prior zoom if we had one
         if has_prior_zoom:
             self._axes.set_xlim(xlim)
-            self._axes.set_ylim(ylim)
+            # Ensure azimuth increases top-to-bottom (ylim[0] < ylim[1])
+            y0, y1 = ylim
+            self._axes.set_ylim(min(y0, y1), max(y0, y1))
+
+        # Ensure y-axis is never flipped (azimuth top-to-bottom)
+        if not self._axes.yaxis_inverted():
+            self._axes.invert_yaxis()
 
         # Axis labels
         if img is not None:
@@ -304,6 +321,13 @@ class ImageViewerPanel(QWidget):
             if parts:
                 self._axes.set_title(" | ".join(parts), fontsize=9)
 
+        # Restore peak markers on the new axes
+        from pySimSAR.gui.widgets.peak_tool import PeakMarker
+        self._peak_finder.ax = self._axes
+        for px, py, pv in saved_peaks:
+            marker = PeakMarker(self._axes, px, py, pv)
+            self._peak_finder.markers.append(marker)
+
         self._canvas.draw_idle()
 
     # ------------------------------------------------------------------
@@ -314,13 +338,23 @@ class ImageViewerPanel(QWidget):
         """Activate or deactivate the peak finder tool."""
         if checked:
             self._peak_finder.ax = self._axes
-            if self._db_data is not None:
-                self._peak_finder.set_image_data(self._db_data)
+            if self._db_data is not None and self._image is not None:
+                img = self._image
+                near_range = img.near_range if img.near_range > 0 else 0.0
+                self._peak_finder.set_image_data(
+                    self._db_data,
+                    origin_x=near_range,
+                    origin_y=0.0,
+                    pixel_spacing_x=img.pixel_spacing_range if img.pixel_spacing_range > 0 else 1.0,
+                    pixel_spacing_y=img.pixel_spacing_azimuth if img.pixel_spacing_azimuth > 0 else 1.0,
+                )
             self._peak_finder.activate(self._canvas)
         else:
             self._peak_finder.deactivate()
 
     def _on_clear_peaks(self) -> None:
-        """Remove all peak markers."""
+        """Remove all peak markers and exit Find Peak mode."""
+        if self._btn_find_peak.isChecked():
+            self._btn_find_peak.setChecked(False)
         self._peak_finder.clear_all_markers()
         self._canvas.draw_idle()

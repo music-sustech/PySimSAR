@@ -1,7 +1,9 @@
 {
   "image_formation": {
     "algorithm": "range_doppler",
-    "params": {}
+    "params": {
+      "apply_rcmc": true
+    }
   },
   "moco": null,
   "autofocus": null,

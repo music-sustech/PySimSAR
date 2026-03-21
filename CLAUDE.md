@@ -6,6 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 PySimSAR is a Spec-Driven Development project using the Speckit framework (v0.3.0) with Claude Code integration. It is initialized from a Specify template and configured with PowerShell scripts.
 
+## Project Rules
+- **Linting:** Always run `ruff check . --fix` after modifying Python files.
+- **Style:** We follow PEP8; no unused imports or variables in the final PR.
+- **Complexity:** Keep cyclomatic complexity under 10 for signal processing functions.
+- **Synchronized docs** After modifying code, make sure to update the relevant spec/plan/task and docs.
+
+
 ## Development Workflow
 
 Features are developed through the Speckit pipeline:
@@ -49,8 +56,9 @@ Features are developed through the Speckit pipeline:
 - Story labels: `[US1]`, `[US2]`, etc.
 - Priorities: P1 (MVP), P2, P3
 
-## Prerequisites
 
+
+## Prerequisites
 - PowerShell (cross-platform `pwsh`)
 - Git
 - Claude Code
@@ -66,3 +74,4 @@ Features are developed through the Speckit pipeline:
 - Use `python` not `python3`
 - To chain commands: `cd "path"; python -m pytest` or use `-Command` blocks
 - Prefer `$env:VAR` over `export VAR=`
+

@@ -9,17 +9,16 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pySimSAR.core.scene import Scene, PointTarget
-from pySimSAR.core.radar import Radar, create_antenna_from_preset
 from pySimSAR.core.platform import Platform
+from pySimSAR.core.radar import Radar, create_antenna_from_preset
+from pySimSAR.core.scene import PointTarget, Scene
 from pySimSAR.core.types import RawData, SARImage
 from pySimSAR.io.config import ProcessingConfig, SimulationConfig
-from pySimSAR.io.hdf5_format import write_hdf5, read_hdf5, import_data
-from pySimSAR.simulation.engine import SimulationEngine
-from pySimSAR.pipeline.runner import PipelineRunner
-from pySimSAR.waveforms.lfm import LFMWaveform
+from pySimSAR.io.hdf5_format import import_data, read_hdf5, write_hdf5
 from pySimSAR.motion.trajectory import Trajectory
-
+from pySimSAR.pipeline.runner import PipelineRunner
+from pySimSAR.simulation.engine import SimulationEngine
+from pySimSAR.waveforms.lfm import LFMWaveform
 
 # --------------------------------------------------------------------------
 # Fixtures
@@ -41,7 +40,6 @@ def antenna():
         "flat",
         az_beamwidth=np.radians(3.0),
         el_beamwidth=np.radians(5.0),
-        peak_gain_dB=30.0,
     )
 
 

@@ -1,0 +1,28 @@
+{
+  "format_version": "1.0",
+  "name": "ScanSAR CSA",
+  "description": "Scan-SAR with 3 sub-swaths",
+  "scene": {
+    "$ref": "scene.json"
+  },
+  "radar": {
+    "$ref": "radar.json"
+  },
+  "sarmode": {
+    "$ref": "sarmode.json"
+  },
+  "platform": {
+    "$ref": "platform.json"
+  },
+  "simulation": {
+    "seed": 42,
+    "sample_rate_hz": null,
+    "swath_range_m": [
+      600,
+      1600
+    ]
+  },
+  "processing": {
+    "$ref": "processing.json"
+  }
+}

@@ -14,16 +14,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pySimSAR.core.scene import Scene, PointTarget
 from pySimSAR.core.radar import AntennaPattern, Radar
+from pySimSAR.core.scene import PointTarget, Scene
 from pySimSAR.core.types import RawData, SARImage
-from pySimSAR.waveforms.lfm import LFMWaveform
-from pySimSAR.simulation.engine import SimulationEngine
-from pySimSAR.pipeline.runner import PipelineRunner, PipelineResult
 from pySimSAR.io.config import ProcessingConfig
-from pySimSAR.io.hdf5_format import write_hdf5, read_hdf5
+from pySimSAR.io.hdf5_format import read_hdf5, write_hdf5
 from pySimSAR.motion.trajectory import Trajectory
-
+from pySimSAR.pipeline.runner import PipelineRunner
+from pySimSAR.simulation.engine import SimulationEngine
+from pySimSAR.waveforms.lfm import LFMWaveform
 
 N_PULSES = 128
 
@@ -54,7 +53,6 @@ def _setup_quad_pol_simulation():
         pattern_2d=pattern,
         az_beamwidth=np.radians(10),
         el_beamwidth=np.radians(10),
-        peak_gain_dB=30.0,
         az_angles=az,
         el_angles=el,
     )

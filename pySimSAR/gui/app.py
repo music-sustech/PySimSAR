@@ -9,11 +9,12 @@ Layout (post-overhaul):
 from __future__ import annotations
 
 import math
+import os
 import sys
 from pathlib import Path
 
 import numpy as np
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication,
@@ -22,6 +23,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
     QFormLayout,
+    QLabel,
     QMainWindow,
     QMessageBox,
     QProgressBar,
@@ -32,38 +34,38 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from pySimSAR.gui.widgets.param_tree import ParameterTreeWidget
-from pySimSAR.gui.widgets.calc_panel import CalculatedValuesPanel
-from pySimSAR.gui.widgets.preset_browser import PresetBrowserDialog
-from pySimSAR.gui.wizards.project_wizard import ProjectCreationWizard
-from pySimSAR.gui.wizards.import_wizard import ImportWizard
-from pySimSAR.gui.panels.scene_3d import SceneViewerPanel
-from pySimSAR.gui.panels.trajectory import TrajectoryViewerPanel
+from pySimSAR.core.flight_path import compute_flight_path
+from pySimSAR.core.platform import Platform
+from pySimSAR.core.radar import Radar, create_antenna_from_preset
+from pySimSAR.core.scene import PointTarget, Scene
+from pySimSAR.core.types import SARModeConfig
+from pySimSAR.gui.controllers.simulation_ctrl import ProjectModel, SimulationController
+from pySimSAR.gui.panels.azimuth_profile import AzimuthProfilePanel
 from pySimSAR.gui.panels.beam_animation import BeamAnimationPanel
+from pySimSAR.gui.panels.doppler_spectrum import DopplerSpectrumPanel
 from pySimSAR.gui.panels.image_viewer import ImageViewerPanel
 from pySimSAR.gui.panels.phase_history import PhaseHistoryPanel
-from pySimSAR.gui.panels.range_profile import RangeProfilePanel
-from pySimSAR.gui.panels.azimuth_profile import AzimuthProfilePanel
-from pySimSAR.gui.panels.doppler_spectrum import DopplerSpectrumPanel
 from pySimSAR.gui.panels.polarimetry import PolarimetryPanel
-from pySimSAR.gui.controllers.simulation_ctrl import SimulationController, ProjectModel
-from pySimSAR.core.scene import Scene, PointTarget
-from pySimSAR.core.radar import Radar, create_antenna_from_preset
-from pySimSAR.core.types import SARModeConfig
-from pySimSAR.core.platform import Platform
-from pySimSAR.core.flight_path import compute_flight_path
-from pySimSAR.waveforms.lfm import LFMWaveform
-from pySimSAR.waveforms.fmcw import FMCWWaveform
-from pySimSAR.waveforms.phase_noise import CompositePSDPhaseNoise
+from pySimSAR.gui.panels.range_profile import RangeProfilePanel
+from pySimSAR.gui.panels.scene_3d import SceneViewerPanel
+from pySimSAR.gui.panels.trajectory import TrajectoryViewerPanel
+from pySimSAR.gui.widgets.calc_panel import CalculatedValuesPanel
+from pySimSAR.gui.widgets.param_tree import ParameterTreeWidget
+from pySimSAR.gui.widgets.preset_browser import PresetBrowserDialog
+from pySimSAR.gui.wizards.import_wizard import ImportWizard
+from pySimSAR.gui.wizards.project_wizard import ProjectCreationWizard
 from pySimSAR.io.archive import pack_project, unpack_project
 from pySimSAR.io.config import ProcessingConfig
-from pySimSAR.io.parameter_set import load_default_gui_params
+from pySimSAR.io.parameter_set import load_default_gui_params, make_window
 from pySimSAR.io.user_data import UserDataDir
 from pySimSAR.motion.perturbation import DrydenTurbulence
 from pySimSAR.sensors.gps import GPSSensor
 from pySimSAR.sensors.gps_gaussian import GaussianGPSError
 from pySimSAR.sensors.imu import IMUSensor
 from pySimSAR.sensors.imu_white_noise import WhiteNoiseIMUError
+from pySimSAR.waveforms.fmcw import FMCWWaveform
+from pySimSAR.waveforms.lfm import LFMWaveform
+from pySimSAR.waveforms.phase_noise import CompositePSDPhaseNoise
 
 
 class PreferencesDialog(QDialog):
@@ -235,8 +237,92 @@ class MainWindow(QMainWindow):
         self._progress_bar.setValue(0)
         self._progress_bar.setTextVisible(True)
         self._progress_bar.setFixedWidth(250)
+
+        self._mem_label = QLabel()
+        self._mem_label.setFixedWidth(200)
+        self._mem_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self._update_memory_label()
+
+        self._mem_timer = QTimer(self)
+        self._mem_timer.timeout.connect(self._update_memory_label)
+        self._mem_timer.start(2000)
+
+        self.statusBar().addPermanentWidget(self._mem_label)
         self.statusBar().addPermanentWidget(self._progress_bar)
         self.statusBar().showMessage("Ready")
+
+    def _update_memory_label(self) -> None:
+        """Update the status bar memory usage label using OS process info."""
+        mem = self._get_rss_bytes()
+        if mem < 0:
+            self._mem_label.setText("Memory Usage: N/A")
+            return
+        self._mem_label.setText(f"Memory Usage: {mem / 1024 ** 3:.2f} GB")
+
+    @staticmethod
+    def _get_rss_bytes() -> int:
+        """Return process RSS in bytes (cross-platform)."""
+        # 1. psutil — works on all platforms if installed
+        try:
+            import psutil
+            return psutil.Process(os.getpid()).memory_info().rss
+        except Exception:
+            pass
+        # 2. Platform-specific fallbacks (no third-party deps)
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                from ctypes import wintypes
+                class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+                    _fields_ = [
+                        ("cb", wintypes.DWORD),
+                        ("PageFaultCount", wintypes.DWORD),
+                        ("PeakWorkingSetSize", ctypes.c_size_t),
+                        ("WorkingSetSize", ctypes.c_size_t),
+                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                        ("PagefileUsage", ctypes.c_size_t),
+                        ("PeakPagefileUsage", ctypes.c_size_t),
+                    ]
+                counters = PROCESS_MEMORY_COUNTERS()
+                counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
+                k32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+                k32.GetCurrentProcess.restype = wintypes.HANDLE
+                k32.GetCurrentProcess.argtypes = []
+                k32.K32GetProcessMemoryInfo.argtypes = [
+                    wintypes.HANDLE,
+                    ctypes.POINTER(PROCESS_MEMORY_COUNTERS),
+                    wintypes.DWORD,
+                ]
+                k32.K32GetProcessMemoryInfo.restype = wintypes.BOOL
+                handle = k32.GetCurrentProcess()
+                if k32.K32GetProcessMemoryInfo(
+                    handle, ctypes.byref(counters), counters.cb
+                ):
+                    return counters.WorkingSetSize
+            except Exception:
+                pass
+        elif sys.platform == "linux":
+            # /proc/pid/statm gives RSS in pages
+            try:
+                with open(f"/proc/{os.getpid()}/statm") as f:
+                    pages = int(f.read().split()[1])
+                return pages * os.sysconf("SC_PAGE_SIZE")
+            except Exception:
+                pass
+        # 3. resource module — works on macOS and Linux (fallback for both)
+        try:
+            import resource
+            ru = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            # macOS reports bytes; Linux reports kilobytes
+            if sys.platform == "darwin":
+                return ru
+            return ru * 1024
+        except Exception:
+            pass
+        return -1
 
     def _build_central_widget(self) -> None:
         # -- Left panel: ParameterTreeWidget --
@@ -272,9 +358,9 @@ class MainWindow(QMainWindow):
         right_splitter = QSplitter(Qt.Orientation.Vertical)
         right_splitter.addWidget(self._tab_widget)
         right_splitter.addWidget(self._calc_panel)
-        right_splitter.setStretchFactor(0, 3)
-        right_splitter.setStretchFactor(1, 1)
-        right_splitter.setSizes([600, 250])
+        right_splitter.setStretchFactor(0, 4)
+        right_splitter.setStretchFactor(1, 0)
+        right_splitter.setSizes([650, 160])
 
         # -- Main horizontal splitter --
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -306,18 +392,16 @@ class MainWindow(QMainWindow):
             waveform = all_p.get("waveform", {})
             platform = all_p.get("platform", {})
             simulation = all_p.get("simulation", {})
-            scene = all_p.get("scene", {})
 
             calc_params = {
                 "carrier_freq": radar.get("carrier_freq", 9.65e9),
                 "prf": waveform.get("prf", 1000.0),
                 "bandwidth": waveform.get("bandwidth", 100e6),
                 "duty_cycle": waveform.get("duty_cycle", 0.01),
-                "transmit_power": radar.get("transmit_power", 1000.0),
+                "transmit_power": radar.get("transmit_power", 1.0),
                 "az_beamwidth": antenna.get("az_beamwidth", math.radians(10.0)),
                 "el_beamwidth": antenna.get("el_beamwidth", math.radians(10.0)),
-                "peak_gain_dB": antenna.get("peak_gain_dB", 30.0),
-                "depression_angle": sarmode.get("depression_angle", math.radians(45.0)),
+                                "depression_angle": sarmode.get("depression_angle", math.radians(45.0)),
                 "velocity": platform.get("velocity", 100.0),
                 "altitude": platform.get("altitude", 1000.0),
                 "noise_figure": radar.get("noise_figure", 3.0),
@@ -362,7 +446,6 @@ class MainWindow(QMainWindow):
             sarmode_params = all_p["sarmode"]
             waveform_params = all_p["waveform"]
             platform_params = all_p["platform"]
-            simulation_params = all_p["simulation"]
 
             scene = Scene(
                 origin_lat=scene_params["origin_lat"],
@@ -400,7 +483,6 @@ class MainWindow(QMainWindow):
                 total_time = 5.0
 
             n_pulses = max(2, int(prf * total_time))
-            dt = 1.0 / prf if prf > 0 else 0.001
             times = np.linspace(0, total_time, min(n_pulses, 500))
             traj = np.column_stack([
                 start[0] + vel_vec[0] * times,
@@ -459,9 +541,10 @@ class MainWindow(QMainWindow):
                 flicker_pm_level=pn["flicker_pm_level"],
                 white_floor=pn["white_floor"],
             )
-        window = wf_params.get("window")
-        if window is not None:
-            window = getattr(np, window, None)
+        window_params = {}
+        if "kaiser_beta" in wf_params:
+            window_params["beta"] = wf_params["kaiser_beta"]
+        window = make_window(wf_params.get("window"), window_params)
 
         prf = wf_params.get("prf", 1000.0)
         if wf_params["waveform_type"] == "LFM":
@@ -487,7 +570,6 @@ class MainWindow(QMainWindow):
             preset=antenna_params["preset"],
             az_beamwidth=antenna_params["az_beamwidth"],
             el_beamwidth=antenna_params["el_beamwidth"],
-            peak_gain_dB=antenna_params["peak_gain_dB"],
         )
 
         # -- SAR Imaging config --
@@ -495,6 +577,7 @@ class MainWindow(QMainWindow):
             mode=sarmode_params["mode"],
             look_side=sarmode_params["look_side"],
             depression_angle=sarmode_params["depression_angle"],
+            squint_angle=sarmode_params.get("squint_angle", 0.0),
             scene_center=np.array(sarmode_params.get("scene_center", [0, 0, 0]), dtype=float),
             n_subswaths=sarmode_params.get("n_subswaths", 3),
             burst_length=sarmode_params.get("burst_length", 20),
@@ -507,7 +590,6 @@ class MainWindow(QMainWindow):
             waveform=waveform,
             antenna=antenna,
             polarization=radar_params["polarization"],
-            squint_angle=radar_params["squint_angle"],
             receiver_gain_dB=radar_params["receiver_gain_dB"],
             system_losses=radar_params["system_losses"],
             noise_figure=radar_params["noise_figure"],
@@ -532,7 +614,7 @@ class MainWindow(QMainWindow):
             sensors.append(GPSSensor(
                 accuracy_rms=g["accuracy"],
                 update_rate=g["rate"],
-                error_model=GaussianGPSError(sigma=g["accuracy"]),
+                error_model=GaussianGPSError(accuracy_rms=g["accuracy"]),
             ))
         if plat.get("imu") is not None:
             i = plat["imu"]
@@ -615,6 +697,7 @@ class MainWindow(QMainWindow):
 
         self._controller = SimulationController(self)
         self._controller.progress.connect(self._on_progress)
+        self._controller.stage.connect(self._on_stage)
         self._controller.finished.connect(self._on_finished)
         self._controller.error.connect(self._on_error)
 
@@ -634,6 +717,9 @@ class MainWindow(QMainWindow):
 
     def _on_progress(self, value: int) -> None:
         self._progress_bar.setValue(value)
+
+    def _on_stage(self, message: str) -> None:
+        self.statusBar().showMessage(message)
 
     def _on_finished(self, model: ProjectModel) -> None:
         self._model = model
@@ -800,27 +886,45 @@ class MainWindow(QMainWindow):
             )
 
     def _on_open_project(self) -> None:
-        """Open a project from HDF5 or .pysimsar archive."""
+        """Open a project from JSON directory, HDF5, or .pysimsar archive."""
         filepath, _ = QFileDialog.getOpenFileName(
             self,
             "Open Project",
             "",
-            "All Project Files (*.h5 *.hdf5 *.pysimsar);;HDF5 Files (*.h5 *.hdf5);;PySimSAR Archive (*.pysimsar);;All Files (*)",
+            "All Project Files (*.json *.h5 *.hdf5 *.pysimsar);;"
+            "JSON Project (project.json);;"
+            "HDF5 Files (*.h5 *.hdf5);;"
+            "PySimSAR Archive (*.pysimsar);;"
+            "All Files (*)",
         )
         if not filepath:
             return
 
         try:
             fp = Path(filepath)
-            if fp.suffix == ".pysimsar":
-                import tempfile
+            if fp.suffix == ".json":
+                # JSON project directory — load via parameter_set
+                from pySimSAR.io.parameter_set import (
+                    load_parameter_set,
+                    project_to_gui_params,
+                )
+                params = load_parameter_set(fp)
+                gui_params = project_to_gui_params(params)
+                # Convert swath_range from list to tuple
+                sim = gui_params.get("simulation", {})
+                if "swath_range" in sim and isinstance(sim["swath_range"], list):
+                    sim["swath_range"] = tuple(sim["swath_range"])
+                self._param_tree.set_all_parameters(gui_params)
+                self._build_project_model()
+            elif fp.suffix == ".pysimsar":
                 import json
+                import tempfile
                 tmpdir = tempfile.mkdtemp(prefix="pysimsar_")
                 unpack_project(fp, tmpdir)
                 # Load parameters if available
                 params_path = Path(tmpdir) / "parameters.json"
                 if params_path.exists():
-                    with open(params_path, "r", encoding="utf-8") as f:
+                    with open(params_path, encoding="utf-8") as f:
                         params = json.load(f)
                     # Convert swath_range from list to tuple
                     sim = params.get("simulation", {})

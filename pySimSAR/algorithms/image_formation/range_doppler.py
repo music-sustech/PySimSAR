@@ -9,9 +9,9 @@ Implements the classic Range-Doppler algorithm with:
 from __future__ import annotations
 
 import numpy as np
-from scipy.interpolate import interp1d
 
 from pySimSAR.algorithms.base import ImageFormationAlgorithm
+from pySimSAR.algorithms.image_formation._rcmc_interp import sinc_interp
 from pySimSAR.core.radar import C_LIGHT
 from pySimSAR.core.types import PhaseHistoryData, SARImage, SARMode
 
@@ -187,6 +187,7 @@ class RangeDopplerAlgorithm(ImageFormationAlgorithm):
         """
         data_corrected = data_rd.copy()
         range_bins = np.arange(n_rng, dtype=float)
+        interp_order = self._rcmc_interp_order
 
         for k in range(n_az):
             arg = wavelength * f_eta[k] / (2.0 * V)
@@ -205,10 +206,8 @@ class RangeDopplerAlgorithm(ImageFormationAlgorithm):
 
             # Interpolate from original data to correct the migration
             row = data_rd[k, :]
-            data_corrected[k, :] = np.interp(
-                src_positions, range_bins, row.real
-            ) + 1j * np.interp(
-                src_positions, range_bins, row.imag
+            data_corrected[k, :] = sinc_interp(
+                row, src_positions, interp_order
             )
 
         return data_corrected

@@ -118,8 +118,8 @@ class TestIMUSensor:
 
     def test_create_imu_sensor(self):
         """IMUSensor stores config parameters."""
-        from pySimSAR.sensors.imu_white_noise import WhiteNoiseIMUError
         from pySimSAR.sensors.imu import IMUSensor
+        from pySimSAR.sensors.imu_white_noise import WhiteNoiseIMUError
 
         error_model = WhiteNoiseIMUError(
             accel_noise_density=0.0002,
@@ -138,9 +138,9 @@ class TestIMUSensor:
 
     def test_imu_sensor_generate_measurements(self):
         """IMUSensor generates measurements at its sample rate."""
-        from pySimSAR.sensors.imu_white_noise import WhiteNoiseIMUError
-        from pySimSAR.sensors.imu import IMUSensor
         from pySimSAR.motion.trajectory import Trajectory
+        from pySimSAR.sensors.imu import IMUSensor
+        from pySimSAR.sensors.imu_white_noise import WhiteNoiseIMUError
 
         n = 1000
         t = np.linspace(0, 1, n)

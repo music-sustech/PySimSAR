@@ -1,8 +1,0 @@
-{
-  "mode": "spotlight",
-  "look_side": "right",
-  "depression_angle_deg": 45.0,
-  "scene_center_m": [3000, 0, 0],
-  "n_subswaths": 3,
-  "burst_length": 20
-}

@@ -6,9 +6,7 @@ that together define a complete SAR simulation and processing setup.
 
 from __future__ import annotations
 
-import importlib
 import json
-import re
 from pathlib import Path
 
 import numpy as np
@@ -23,6 +21,13 @@ _GEO_KEYS = {"origin_lat_deg", "origin_lon_deg"}
 def _preset_dir() -> Path:
     """Return the path to the shipped presets directory."""
     return Path(__file__).resolve().parent.parent / "presets"
+
+
+def _load_preset(relative_path: str) -> dict:
+    """Load a JSON preset file from the presets directory."""
+    path = _preset_dir() / relative_path
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
 
 def resolve_refs(
@@ -76,7 +81,7 @@ def resolve_refs(
             raise ValueError(f"Circular $ref detected: {canonical}")
         _visited.add(canonical)
 
-        with open(ref_path, "r", encoding="utf-8") as f:
+        with open(ref_path, encoding="utf-8") as f:
             ref_data = json.load(f)
 
         resolved = resolve_refs(ref_data, ref_path.parent, _visited)
@@ -187,7 +192,7 @@ def load_parameter_set(project_path: str | Path) -> dict:
         project_file = project_path / "project.json"
         base_dir = project_path
 
-    with open(project_file, "r", encoding="utf-8") as f:
+    with open(project_file, encoding="utf-8") as f:
         raw = json.load(f)
 
     # Validate format version
@@ -204,8 +209,21 @@ def load_parameter_set(project_path: str | Path) -> dict:
     return converted
 
 
-def _make_window(window_name: str | None, window_params: dict | None = None):
-    """Create a window function callable from a name string."""
+def make_window(window_name: str | None, window_params: dict | None = None):
+    """Create a window function callable from a name string.
+
+    Parameters
+    ----------
+    window_name : str | None
+        Window name (hamming, hanning, blackman, kaiser, tukey) or None.
+    window_params : dict | None
+        Extra parameters, e.g. ``{"beta": 6.0}`` for Kaiser.
+
+    Returns
+    -------
+    callable | None
+        ``f(n) -> np.ndarray`` or None if no window is requested.
+    """
     if window_name is None or window_name.lower() == "none":
         return None
 
@@ -219,9 +237,7 @@ def _make_window(window_name: str | None, window_params: dict | None = None):
     elif name == "blackman":
         return lambda n: np.blackman(n)
     elif name == "kaiser":
-        beta = params.get("beta")
-        if beta is None:
-            raise ValueError("Kaiser window requires 'beta' parameter")
+        beta = params.get("beta", 6.0)
         return lambda n, _b=beta: np.kaiser(n, _b)
     elif name == "tukey":
         from scipy.signal.windows import tukey
@@ -229,6 +245,10 @@ def _make_window(window_name: str | None, window_params: dict | None = None):
         return lambda n, _a=alpha: tukey(n, _a)
     else:
         raise ValueError(f"Unknown window function: {window_name!r}")
+
+
+# Keep backward-compatible alias
+_make_window = make_window
 
 
 def build_simulation(params: dict) -> dict:
@@ -244,14 +264,9 @@ def build_simulation(params: dict) -> dict:
     dict
         Keys: 'scene', 'radar', 'platform', 'engine_kwargs', 'processing_config'.
     """
-    from pySimSAR.core.platform import Platform
-    from pySimSAR.core.radar import Radar, create_antenna_from_preset, AntennaPattern
-    from pySimSAR.core.rcs_model import StaticRCS
+    from pySimSAR.core.radar import Radar
     from pySimSAR.core.scene import DistributedTarget, PointTarget, Scene
-    from pySimSAR.core.types import SARMode, SARModeConfig
-    from pySimSAR.io.config import ProcessingConfig
-    from pySimSAR.waveforms.lfm import LFMWaveform
-    from pySimSAR.waveforms.fmcw import FMCWWaveform
+    from pySimSAR.core.types import SARModeConfig
 
     # --- Scene ---
     scene_params = params.get("scene", {})
@@ -332,10 +347,16 @@ def build_simulation(params: dict) -> dict:
 
     sim_data = params.get("simulation", {})
     scene_center_raw = sarmode_data.get("scene_center")
+    # squint_angle: prefer sarmode block, fall back to radar block for compat
+    squint_angle = sarmode_data.get(
+        "squint_angle",
+        radar_params.get("squint_angle", 0.0),
+    )
     sar_mode_config = SARModeConfig(
         mode=mode_str,
         look_side=sarmode_data.get("look_side", "right"),
         depression_angle=sarmode_data.get("depression_angle", np.radians(45.0)),
+        squint_angle=squint_angle,
         scene_center=(
             np.asarray(scene_center_raw, dtype=float) if scene_center_raw is not None else None
         ),
@@ -346,15 +367,14 @@ def build_simulation(params: dict) -> dict:
     # --- Radar ---
     radar = Radar(
         carrier_freq=radar_params.get("carrier_freq", 9.65e9),
-        transmit_power=radar_params.get("transmit_power", 1000.0),
+        transmit_power=radar_params.get("transmit_power", 1.0),
         waveform=waveform,
         antenna=antenna,
         polarization=radar_params.get("polarization", "single"),
         noise_figure=radar_params.get("noise_figure", 3.0),
         system_losses=radar_params.get("system_losses", 2.0),
         reference_temp=radar_params.get("reference_temp", 290.0),
-        squint_angle=radar_params.get("squint_angle", 0.0),
-        receiver_gain_dB=radar_params.get("receiver_gain", 0.0),
+        receiver_gain_dB=radar_params.get("receiver_gain", 30.0),
         sar_mode_config=sar_mode_config,
     )
 
@@ -366,8 +386,14 @@ def build_simulation(params: dict) -> dict:
     swath_range_raw = sim_data.get("swath_range")
     swath_range = tuple(swath_range_raw) if swath_range_raw is not None else None
 
+    # n_pulses is derived from flight_time × PRF (not stored in project.json)
+    prf = radar.waveform.prf
+    flight_time = plat_data.get("flight_time", 0.5)
+    n_pulses_from_sim = sim_data.get("n_pulses")
+    n_pulses = int(n_pulses_from_sim) if n_pulses_from_sim is not None else max(1, int(prf * flight_time))
+
     engine_kwargs = {
-        "n_pulses": int(sim_data.get("n_pulses", 256)),
+        "n_pulses": n_pulses,
         "seed": int(sim_data.get("seed", 42)),
         "sample_rate": sim_data.get("sample_rate"),
         "sar_mode_config": sar_mode_config,
@@ -395,18 +421,21 @@ def save_parameter_set(
     scene: object,
     radar: object,
     platform: object,
-    n_pulses: int,
     seed: int,
     sample_rate: float | None = None,
     swath_range: tuple[float, float] | None = None,
     processing_config: object | None = None,
     name: str = "",
     description: str = "",
+    flight_time: float = 0.5,
 ) -> Path:
     """Serialize a complete simulation setup to a project directory.
 
     Creates the directory and writes project.json with $ref links to
     component files, plus .npy files for large array data.
+
+    n_pulses is derived from flight_time × PRF and is NOT stored in
+    project.json.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -423,8 +452,8 @@ def save_parameter_set(
     sarmode_data = _serialize_sarmode(radar)
     _write_json(output_dir / "sarmode.json", sarmode_data)
 
-    # Platform
-    platform_data = _serialize_platform(platform, output_dir)
+    # Platform (includes flight_time)
+    platform_data = _serialize_platform(platform, output_dir, flight_time=flight_time)
     _write_json(output_dir / "platform.json", platform_data)
 
     # Processing
@@ -432,7 +461,7 @@ def save_parameter_set(
         proc_data = _serialize_processing_config(processing_config)
         _write_json(output_dir / "processing.json", proc_data)
 
-    # Project.json
+    # Project.json — n_pulses derived from flight_time × PRF, not stored
     project = {
         "format_version": "1.0",
         "name": name,
@@ -442,7 +471,6 @@ def save_parameter_set(
         "sarmode": {"$ref": "sarmode.json"},
         "platform": {"$ref": "platform.json"},
         "simulation": {
-            "n_pulses": n_pulses,
             "seed": seed,
             "sample_rate_hz": sample_rate,
             "swath_range_m": list(swath_range) if swath_range is not None else None,
@@ -509,8 +537,8 @@ def _parse_rcs_model(model_data):
 
 def _build_waveform(wf_data: dict, prf: float | None = None):
     """Build a Waveform from parameter dict."""
-    from pySimSAR.waveforms.lfm import LFMWaveform
     from pySimSAR.waveforms.fmcw import FMCWWaveform
+    from pySimSAR.waveforms.lfm import LFMWaveform
 
     wf_type = wf_data.get("type", "lfm").lower()
     bandwidth = wf_data.get("bandwidth", wf_data.get("bandwidth_hz", 150e6))
@@ -533,7 +561,6 @@ def _build_waveform(wf_data: dict, prf: float | None = None):
         return LFMWaveform(bandwidth=bandwidth, duty_cycle=duty_cycle,
                            window=window, phase_noise=phase_noise, prf=prf)
     elif wf_type == "fmcw":
-        from pySimSAR.core.types import RampType
         ramp = wf_data.get("ramp_type", "up")
         return FMCWWaveform(bandwidth=bandwidth, duty_cycle=duty_cycle,
                             ramp_type=ramp, window=window, phase_noise=phase_noise,
@@ -547,13 +574,12 @@ def _build_antenna(ant_data: dict):
     from pySimSAR.core.radar import AntennaPattern, create_antenna_from_preset
 
     ant_type = ant_data.get("type", "preset")
-    peak_gain = ant_data.get("peak_gain", ant_data.get("peak_gain_dB", 30.0))
 
     if ant_type == "preset":
         preset = ant_data.get("preset", "flat")
         az_bw = ant_data.get("az_beamwidth", ant_data.get("az_beamwidth_deg", np.radians(3.0)))
         el_bw = ant_data.get("el_beamwidth", ant_data.get("el_beamwidth_deg", np.radians(10.0)))
-        return create_antenna_from_preset(preset, az_bw, el_bw, peak_gain)
+        return create_antenna_from_preset(preset, az_bw, el_bw)
     elif ant_type == "measured":
         pattern_data = ant_data.get("pattern", {})
         if isinstance(pattern_data, dict):
@@ -562,10 +588,12 @@ def _build_antenna(ant_data: dict):
             el_angles = pattern_data.get("el_angles")
         else:
             raise ValueError("Measured antenna requires pattern data")
+        az_bw = az_angles[-1] - az_angles[0]
+        el_bw = el_angles[-1] - el_angles[0]
         return AntennaPattern(
-            pattern_2d=pattern_2d, az_beamwidth=az_angles[-1] - az_angles[0],
-            el_beamwidth=el_angles[-1] - el_angles[0],
-            peak_gain_dB=peak_gain, az_angles=az_angles, el_angles=el_angles,
+            pattern_2d=pattern_2d, az_beamwidth=az_bw,
+            el_beamwidth=el_bw,
+            az_angles=az_angles, el_angles=el_angles,
         )
     else:
         raise ValueError(f"Unknown antenna type: {ant_type!r}")
@@ -664,8 +692,6 @@ def _build_processing_config(proc_data: dict):
     if_data = proc_data.get("image_formation", {})
     moco_data = proc_data.get("moco")
     af_data = proc_data.get("autofocus")
-    gc_data = proc_data.get("geocoding")
-    pd_data = proc_data.get("polarimetric_decomposition")
 
     def _algo_name(d):
         if d is None:
@@ -767,7 +793,8 @@ def _serialize_scene(scene, output_dir: Path) -> dict:
             np.save(str(output_dir / fname), dt.elevation)
             dt_data["elevation"] = {"$data": fname}
         if dt.clutter_model is not None:
-            dt_data["clutter_model"] = {"type": "uniform", "mean_intensity": getattr(dt.clutter_model, 'mean_intensity', 1.0)}
+            mean_val = getattr(dt.clutter_model, 'mean_intensity', 1.0)
+            dt_data["clutter_model"] = {"type": "uniform", "mean_intensity": mean_val}
         dt_list.append(dt_data)
 
     if dt_list:
@@ -813,7 +840,6 @@ def _serialize_radar(radar, output_dir: Path) -> dict:
         "preset": "flat",  # default
         "az_beamwidth_deg": np.degrees(ant.az_beamwidth),
         "el_beamwidth_deg": np.degrees(ant.el_beamwidth),
-        "peak_gain_dB": ant.peak_gain_dB,
     }
     _write_json(output_dir / "antenna.json", ant_data)
 
@@ -826,7 +852,6 @@ def _serialize_radar(radar, output_dir: Path) -> dict:
         "system_losses_dB": radar.system_losses,
         "reference_temp_K": radar.reference_temp,
         "polarization": radar.polarization.value,
-        "squint_angle_deg": np.degrees(radar.squint_angle),
         "waveform": {"$ref": "waveform.json"},
         "antenna": {"$ref": "antenna.json"},
     }
@@ -839,13 +864,14 @@ def _serialize_sarmode(radar) -> dict:
         "mode": cfg.mode.value,
         "look_side": cfg.look_side.value,
         "depression_angle_deg": np.degrees(cfg.depression_angle),
+        "squint_angle_deg": np.degrees(cfg.squint_angle),
         "scene_center_m": cfg.scene_center.tolist() if cfg.scene_center is not None else None,
         "n_subswaths": cfg.n_subswaths,
         "burst_length": cfg.burst_length,
     }
 
 
-def _serialize_platform(platform, output_dir: Path) -> dict:
+def _serialize_platform(platform, output_dir: Path, flight_time: float = 0.5) -> dict:
     """Serialize Platform to JSON dict."""
     if platform is None:
         return {}
@@ -854,6 +880,8 @@ def _serialize_platform(platform, output_dir: Path) -> dict:
         "velocity_mps": platform.velocity,
         "altitude_m": platform.altitude,
         "heading": platform.heading_vector.tolist(),
+        "flight_path_mode": "heading_time",
+        "flight_time": flight_time,
     }
 
     if platform.start_position is not None:
@@ -943,10 +971,16 @@ def project_to_gui_params(params: dict) -> dict:
     proc_data = params.get("processing", {})
 
     # --- sarmode (imaging geometry) ---
+    # squint_angle: prefer sarmode, fall back to radar for compat
+    squint_val = sarmode_data.get(
+        "squint_angle",
+        radar_data.get("squint_angle", 0.0),
+    )
     sarmode = {
         "mode": sarmode_data.get("mode", "stripmap"),
         "look_side": sarmode_data.get("look_side", "right"),
         "depression_angle": sarmode_data.get("depression_angle", np.radians(45.0)),
+        "squint_angle": squint_val,
         "scene_center": sarmode_data.get("scene_center", [0, 0, 0]),
         "n_subswaths": sarmode_data.get("n_subswaths", 3),
         "burst_length": sarmode_data.get("burst_length", 20),
@@ -966,11 +1000,10 @@ def project_to_gui_params(params: dict) -> dict:
 
     radar = {
         "carrier_freq": radar_data.get("carrier_freq", 9.65e9),
-        "transmit_power": radar_data.get("transmit_power", 1000.0),
-        "receiver_gain_dB": radar_data.get("receiver_gain", 0.0),
+        "transmit_power": radar_data.get("transmit_power", 1.0),
+        "receiver_gain_dB": radar_data.get("receiver_gain", 30.0),
         "system_losses": radar_data.get("system_losses", 2.0),
         "noise_figure": radar_data.get("noise_figure", 3.0),
-        "squint_angle": radar_data.get("squint_angle", 0.0),
         "reference_temp": radar_data.get("reference_temp", 290.0),
         "polarization": radar_data.get("polarization", "single"),
     }
@@ -979,8 +1012,15 @@ def project_to_gui_params(params: dict) -> dict:
         "preset": ant_data.get("preset", "flat"),
         "az_beamwidth": ant_data.get("az_beamwidth", np.radians(10.0)),
         "el_beamwidth": ant_data.get("el_beamwidth", np.radians(10.0)),
-        "peak_gain_dB": ant_data.get("peak_gain", 30.0),
     }
+
+    phase_noise_data = wf_data.get("phase_noise")
+    phase_noise_enabled = phase_noise_data is not None
+    if phase_noise_data is None:
+        try:
+            phase_noise_data = _load_preset("waveforms/phase_noise_default.json")
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
 
     waveform = {
         "waveform_type": (wf_data.get("type", "lfm")).upper(),
@@ -988,11 +1028,74 @@ def project_to_gui_params(params: dict) -> dict:
         "bandwidth": wf_data.get("bandwidth", 100e6),
         "duty_cycle": wf_data.get("duty_cycle", 0.01),
         "window": wf_data.get("window"),
-        "phase_noise": wf_data.get("phase_noise"),
+        "phase_noise": phase_noise_data,
+        "phase_noise_enabled": phase_noise_enabled,
     }
 
     # --- platform ---
     heading_raw = plat_data.get("heading", [0, 1, 0])
+
+    # Extract GPS/IMU from sensors list (project JSON uses "sensors", not
+    # top-level "gps"/"imu" keys).
+    gps_data = None
+    imu_data = None
+    gps_enabled = False
+    imu_enabled = False
+    sensors_list = plat_data.get("sensors") or []
+    if isinstance(sensors_list, list):
+        for s in sensors_list:
+            if not isinstance(s, dict):
+                continue
+            stype = s.get("type", "").lower()
+            if stype == "gps":
+                gps_data = {
+                    "accuracy": s.get("accuracy_rms", s.get("accuracy_rms_m", 0.002)),
+                    "rate": s.get("update_rate", s.get("update_rate_hz", 10.0)),
+                }
+                gps_enabled = True
+            elif stype == "imu":
+                imu_data = {
+                    "accel_noise": s.get(
+                        "accel_noise_density", 0.0001
+                    ),
+                    "gyro_noise": s.get(
+                        "gyro_noise_density", 0.00001
+                    ),
+                    "rate": s.get("sample_rate", s.get("sample_rate_hz", 200.0)),
+                }
+                imu_enabled = True
+
+    # Load preset defaults for disabled optional features so GUI spinners
+    # are pre-populated with sensible values even when the feature is off.
+    perturbation_data = plat_data.get("perturbation")
+    perturbation_enabled = perturbation_data is not None
+    if perturbation_data is None:
+        try:
+            perturbation_data = _load_preset("perturbation/dryden_default.json")
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+    if gps_data is None:
+        try:
+            gp = _load_preset("sensors/rtk_gps.json")
+            gps_data = {
+                "accuracy": gp.get("accuracy_rms_m", 0.002),
+                "rate": gp.get("update_rate_hz", 10.0),
+            }
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+    if imu_data is None:
+        try:
+            ip = _load_preset("sensors/navigation_imu.json")
+            imu_data = {
+                "accel_noise": ip.get("accel_noise_density", 0.0001),
+                "gyro_noise": ip.get("gyro_noise_density", 0.00001),
+                "rate": ip.get("sample_rate_hz", 200.0),
+            }
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
     platform = {
         "velocity": plat_data.get("velocity", 100.0),
         "altitude": plat_data.get("altitude", 1000.0),
@@ -1000,9 +1103,12 @@ def project_to_gui_params(params: dict) -> dict:
         "start_position": plat_data.get("start_position", [0, -25, 1000]),
         "flight_path_mode": plat_data.get("flight_path_mode", "heading_time"),
         "flight_time": plat_data.get("flight_time", 0.5),
-        "perturbation": plat_data.get("perturbation"),
-        "gps": plat_data.get("gps"),
-        "imu": plat_data.get("imu"),
+        "perturbation": perturbation_data,
+        "perturbation_enabled": perturbation_enabled,
+        "gps": gps_data,
+        "gps_enabled": gps_enabled,
+        "imu": imu_data,
+        "imu_enabled": imu_enabled,
     }
 
     # --- scene ---
@@ -1068,6 +1174,7 @@ __all__ = [
     "load_parameter_set",
     "build_simulation",
     "save_parameter_set",
+    "make_window",
     "project_to_gui_params",
     "load_default_gui_params",
 ]

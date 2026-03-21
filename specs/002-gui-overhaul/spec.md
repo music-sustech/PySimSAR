@@ -193,7 +193,6 @@ The engineer wants to quickly load pre-configured parameter sets for common scen
 
 - **FR-001**: The system MUST present all simulation parameters in a hierarchical tree structure with at least two levels of nesting (category > sub-group), with parameter values editable inline directly within tree rows (the tree IS the editor — no separate editor pane).
 - **FR-001a**: Algorithm-specific parameters MUST be dynamically loaded as inline child nodes in the tree when an algorithm is selected from its dropdown.
-- **FR-001b**: Top-level categories in the parameter tree (Radar, Antenna, Waveform, Platform, Scene, Simulation, Processing) MUST each display a distinctive icon for quick visual identification.
 - **FR-002**: The system MUST preserve all existing parameter editing capabilities from the current flat sidebar — no parameter may become inaccessible after the tree migration.
 - **FR-002a**: Every parameter in the tree MUST display a descriptive tooltip on mouse hover, explaining what the parameter does, its valid range, and its unit. Tooltips are enabled by default and can be turned off in the Preferences menu.
 - **FR-003**: The system MUST support search/filter functionality within the parameter tree, allowing users to find parameters by name or keyword.
@@ -320,7 +319,6 @@ The engineer wants to quickly load pre-configured parameter sets for common scen
 - Real measurement data import with parameter gap detection
 - Parameter hover tooltips with toggle in Preferences menu
 - Preferences menu with persistent user settings
-- Tree category icons for visual identification
 - Proper low-poly 3D aircraft model (OBJ/STL) replacing crude procedural mesh
 
 **Out of scope:**

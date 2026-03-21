@@ -1,9 +1,11 @@
 """Azimuth profile (1D power vs azimuth) visualization panel."""
 from __future__ import annotations
+
 import numpy as np
-from PyQt6.QtWidgets import QVBoxLayout, QWidget, QHBoxLayout, QLabel, QSpinBox
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QSpinBox, QVBoxLayout, QWidget
+
 
 class AzimuthProfilePanel(QWidget):
     def __init__(self, parent=None):
@@ -22,7 +24,10 @@ class AzimuthProfilePanel(QWidget):
         self._fig = Figure(figsize=(5, 3), tight_layout=True)
         self._canvas = FigureCanvasQTAgg(self._fig)
         self._ax = self._fig.add_subplot(111)
-        self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+        self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
         layout.addWidget(self._canvas)
 
         self._image = None
@@ -36,7 +41,10 @@ class AzimuthProfilePanel(QWidget):
     def _refresh(self):
         self._ax.clear()
         if self._image is None:
-            self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+            self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
             self._canvas.draw_idle()
             return
         rg = self._rg_spin.value()
@@ -52,5 +60,8 @@ class AzimuthProfilePanel(QWidget):
     def clear(self):
         self._image = None
         self._ax.clear()
-        self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+        self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
         self._canvas.draw_idle()

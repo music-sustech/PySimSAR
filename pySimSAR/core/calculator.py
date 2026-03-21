@@ -28,13 +28,14 @@ class SARCalculator:
 
         Expected *params* keys (all SI units):
             carrier_freq, prf, bandwidth, duty_cycle, transmit_power,
-            az_beamwidth, el_beamwidth, peak_gain_dB, depression_angle,
+            az_beamwidth, el_beamwidth, depression_angle,
             velocity, altitude, noise_figure, system_losses, receiver_gain_dB,
             reference_temp, mode,
             near_range (opt), far_range (opt), flight_time (opt),
             start_position (opt), stop_position (opt).
         """
         keys = [
+            "antenna_gain",
             "wavelength",
             "pulse_width",
             "range_resolution",
@@ -86,6 +87,15 @@ class SARCalculator:
         return 10.0 ** (db / 10.0)
 
     # -------------------------------------------------------- derived values
+
+    def _calc_antenna_gain(self, params: dict) -> CalculatedResult:
+        """G = 4*pi*eta / (theta_az * theta_el), eta=0.6 typical."""
+        eta = 0.6
+        theta_az = params["az_beamwidth"]
+        theta_el = params["el_beamwidth"]
+        g_linear = 4.0 * math.pi * eta / (theta_az * theta_el)
+        g_dB = 10.0 * math.log10(g_linear)
+        return CalculatedResult(value=g_dB, unit="dBi")
 
     def _calc_wavelength(self, params: dict) -> CalculatedResult:
         return CalculatedResult(value=self._wavelength(params), unit="m")
@@ -151,7 +161,7 @@ class SARCalculator:
         B = params["bandwidth"]
         L = self._db_to_linear(params["system_losses"])
         Pt = params["transmit_power"]
-        G = self._db_to_linear(params["peak_gain_dB"])
+        G = self._db_to_linear(self._calc_antenna_gain(params).value)
         prf = params["prf"]
         dc = params["duty_cycle"]
 
@@ -181,7 +191,7 @@ class SARCalculator:
         B = params["bandwidth"]
         L = self._db_to_linear(params["system_losses"])
         Pt = params["transmit_power"]
-        G = self._db_to_linear(params["peak_gain_dB"])
+        G = self._db_to_linear(self._calc_antenna_gain(params).value)
         sigma = 1.0  # 1 m^2 reference target
 
         numerator = Pt * G**2 * wl**2 * sigma
@@ -257,6 +267,7 @@ class SARCalculator:
     # ---------------------------------------------------- dispatch table
 
     _DISPATCH: dict[str, object] = {
+        "antenna_gain": _calc_antenna_gain,
         "wavelength": _calc_wavelength,
         "pulse_width": _calc_pulse_width,
         "range_resolution": _calc_range_resolution,

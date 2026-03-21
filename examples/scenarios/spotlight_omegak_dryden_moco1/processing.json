@@ -1,0 +1,11 @@
+{
+  "image_formation": {
+    "algorithm": "omega_k",
+    "params": {}
+  },
+  "moco": {
+    "algorithm": "first_order",
+    "params": {}
+  },
+  "autofocus": null
+}

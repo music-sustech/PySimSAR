@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 import numpy as np
@@ -47,6 +47,8 @@ class SARModeConfig:
         Antenna look direction relative to flight track.
     depression_angle : float
         Depression angle in radians, range [0, pi/2].
+    squint_angle : float
+        Squint angle in radians, range [-pi/2, pi/2]. 0 = broadside.
     scene_center : np.ndarray | None
         Scene center for spotlight/scansar beam pointing, shape (3,).
     n_subswaths : int
@@ -58,6 +60,7 @@ class SARModeConfig:
     mode: SARMode | str = SARMode.STRIPMAP
     look_side: LookSide | str = LookSide.RIGHT
     depression_angle: float = 0.7854  # pi/4 radians (45 deg)
+    squint_angle: float = 0.0  # radians, [-pi/2, pi/2]
     scene_center: np.ndarray | None = None
     n_subswaths: int = 3
     burst_length: int = 20

@@ -15,11 +15,10 @@ from typing import TYPE_CHECKING
 import h5py
 import numpy as np
 
-from pySimSAR.core.types import RawData, PhaseHistoryData, SARImage
+from pySimSAR.core.types import RawData, SARImage
 
 if TYPE_CHECKING:
-    from pySimSAR.motion.trajectory import Trajectory
-    from pySimSAR.sensors.nav_data import NavigationData
+    pass
 
 # Compression threshold in bytes (1 MB)
 _COMPRESS_THRESHOLD = 1_000_000

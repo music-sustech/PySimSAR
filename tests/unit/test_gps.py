@@ -85,8 +85,8 @@ class TestGPSSensor:
 
     def test_create_gps_sensor(self):
         """GPSSensor stores config parameters."""
-        from pySimSAR.sensors.gps_gaussian import GaussianGPSError
         from pySimSAR.sensors.gps import GPSSensor
+        from pySimSAR.sensors.gps_gaussian import GaussianGPSError
 
         error_model = GaussianGPSError(accuracy_rms=0.02)
         sensor = GPSSensor(
@@ -101,8 +101,8 @@ class TestGPSSensor:
 
     def test_gps_sensor_with_outages(self):
         """GPSSensor can have outage intervals."""
-        from pySimSAR.sensors.gps_gaussian import GaussianGPSError
         from pySimSAR.sensors.gps import GPSSensor
+        from pySimSAR.sensors.gps_gaussian import GaussianGPSError
 
         sensor = GPSSensor(
             accuracy_rms=0.5,
@@ -114,9 +114,9 @@ class TestGPSSensor:
 
     def test_gps_sensor_generate_measurements(self):
         """GPSSensor generates measurements at its update rate."""
-        from pySimSAR.sensors.gps_gaussian import GaussianGPSError
-        from pySimSAR.sensors.gps import GPSSensor
         from pySimSAR.motion.trajectory import Trajectory
+        from pySimSAR.sensors.gps import GPSSensor
+        from pySimSAR.sensors.gps_gaussian import GaussianGPSError
 
         n = 1000
         t = np.linspace(0, 1, n)
@@ -141,9 +141,9 @@ class TestGPSSensor:
 
     def test_gps_sensor_outage_masks_data(self):
         """During outage intervals, GPS produces no measurements."""
-        from pySimSAR.sensors.gps_gaussian import GaussianGPSError
-        from pySimSAR.sensors.gps import GPSSensor
         from pySimSAR.motion.trajectory import Trajectory
+        from pySimSAR.sensors.gps import GPSSensor
+        from pySimSAR.sensors.gps_gaussian import GaussianGPSError
 
         n = 10000
         t = np.linspace(0, 10, n)

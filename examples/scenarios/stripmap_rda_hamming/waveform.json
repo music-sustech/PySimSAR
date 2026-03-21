@@ -1,0 +1,7 @@
+{
+  "type": "lfm",
+  "bandwidth_hz": 300000000.0,
+  "duty_cycle": 0.01,
+  "window": "hamming",
+  "phase_noise": null
+}

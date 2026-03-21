@@ -1,0 +1,14 @@
+{
+  "image_formation": {
+    "algorithm": "range_doppler",
+    "params": {}
+  },
+  "moco": {
+    "algorithm": "first_order",
+    "params": {}
+  },
+  "autofocus": {
+    "algorithm": "ppp",
+    "params": {}
+  }
+}

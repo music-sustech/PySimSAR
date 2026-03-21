@@ -6,24 +6,18 @@ ProjectModel manages project state: scene, radar, configs, results.
 
 from __future__ import annotations
 
-import json
-import traceback
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
-import numpy as np
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 from pySimSAR.core.platform import Platform
 from pySimSAR.core.radar import Radar
 from pySimSAR.core.scene import Scene
-from pySimSAR.core.types import RawData, SARImage, SARModeConfig
+from pySimSAR.core.types import RawData, SARModeConfig
 from pySimSAR.io.config import ProcessingConfig, SimulationConfig
 from pySimSAR.io.hdf5_format import import_data, read_hdf5, write_hdf5
 from pySimSAR.pipeline.runner import PipelineResult, PipelineRunner
 from pySimSAR.simulation.engine import SimulationEngine, SimulationResult
-
 
 # ---------------------------------------------------------------------------
 # ProjectModel
@@ -253,6 +247,7 @@ class _SimulationWorker(QObject):
     """Executes simulation and pipeline processing on a background thread."""
 
     progress = pyqtSignal(int)
+    stage = pyqtSignal(str)
     finished = pyqtSignal(object)  # SimulationResult or PipelineResult
     error = pyqtSignal(str)
 
@@ -276,6 +271,7 @@ class _SimulationWorker(QObject):
 
         # -- Phase 1: Simulation (skip if imported) -----------------------
         if not model.is_imported:
+            self.stage.emit("Initializing simulation engine")
             self.progress.emit(5)
             if self._cancelled:
                 return
@@ -296,6 +292,11 @@ class _SimulationWorker(QObject):
                 engine_kwargs["sar_mode_config"] = model.sar_mode_config
             engine = SimulationEngine(**engine_kwargs)
 
+            n_tgt = len(model.scene.point_targets) if model.scene else 0
+            self.stage.emit(
+                f"Generating radar echo signals ({n_tgt} targets, "
+                f"{model.n_pulses} pulses)"
+            )
             self.progress.emit(10)
             if self._cancelled:
                 return
@@ -317,6 +318,7 @@ class _SimulationWorker(QObject):
             if self._cancelled:
                 return
 
+            self.stage.emit("Preparing processing pipeline")
             self.progress.emit(60)
 
             trajectory = None
@@ -331,7 +333,9 @@ class _SimulationWorker(QObject):
                 trajectory = model._imported_data.get("trajectory")
                 nav_data = model._imported_data.get("navigation_data")
 
-            runner = PipelineRunner(model.processing_config)
+            runner = PipelineRunner(
+                model.processing_config, stage_callback=self.stage.emit
+            )
 
             if self._cancelled:
                 return
@@ -345,6 +349,7 @@ class _SimulationWorker(QObject):
                 ideal_trajectory=ideal_trajectory,
             )
             model.pipeline_result = pipeline_result
+            self.stage.emit("Finalizing results")
             self.progress.emit(95)
 
         self.progress.emit(100)
@@ -370,6 +375,7 @@ class SimulationController(QObject):
     """
 
     progress = pyqtSignal(int)
+    stage = pyqtSignal(str)
     finished = pyqtSignal(object)
     error = pyqtSignal(str)
 
@@ -404,6 +410,7 @@ class SimulationController(QObject):
         # Connect signals
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self.progress)
+        self._worker.stage.connect(self.stage)
         self._worker.finished.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
 

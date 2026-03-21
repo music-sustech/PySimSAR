@@ -41,7 +41,6 @@
 15. Preset browser with two-tier system
 16. .pysimsar archive format
 17. User data directory + preferences
-18. Tree category icons
 19. OBJ aircraft model
 20. Parameter tooltips
 
@@ -54,7 +53,7 @@ pySimSAR/
 ├── assets/
 │   ├── models/
 │   │   └── aircraft.obj       # NEW: 3D aircraft model
-│   └── icons/                 # NEW: Tree category icons
+│   └── icons/                 # (reserved for future use)
 ├── gui/
 │   ├── app.py                 # MODIFIED: New layout with splitters
 │   ├── widgets/

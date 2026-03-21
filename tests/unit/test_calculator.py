@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from pySimSAR.core.calculator import SARCalculator, CalculatedResult
+from pySimSAR.core.calculator import CalculatedResult, SARCalculator
 
 C = 299792458.0
 K_B = 1.380649e-23
@@ -31,7 +31,7 @@ def params_xband() -> dict:
         "transmit_power": 1000.0,
         "az_beamwidth": math.radians(10.0),
         "el_beamwidth": math.radians(10.0),
-        "peak_gain_dB": 30.0,
+
         "depression_angle": math.radians(45.0),
         "velocity": 100.0,
         "altitude": 1000.0,
@@ -56,7 +56,6 @@ def params_cband() -> dict:
         "transmit_power": 5000.0,
         "az_beamwidth": math.radians(0.3),
         "el_beamwidth": math.radians(5.0),
-        "peak_gain_dB": 42.0,
         "depression_angle": math.radians(30.0),
         "velocity": 7500.0,
         "altitude": 700000.0,
@@ -81,7 +80,6 @@ def params_wband() -> dict:
         "transmit_power": 0.01,
         "az_beamwidth": math.radians(3.0),
         "el_beamwidth": math.radians(10.0),
-        "peak_gain_dB": 25.0,
         "depression_angle": math.radians(60.0),
         "velocity": 30.0,
         "altitude": 100.0,

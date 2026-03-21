@@ -16,18 +16,16 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from pathlib import Path
-
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
-    QHeaderView,
     QHBoxLayout,
+    QHeaderView,
     QLineEdit,
     QPushButton,
     QSpinBox,
@@ -46,7 +44,6 @@ from pySimSAR.gui.widgets.param_editor import (
     _CleanDoubleSpinBox,
     _combo,
     _int_spin,
-    _no_scroll_unless_focused,
     _plain_spin,
 )
 
@@ -78,13 +75,13 @@ _TOOLTIPS: dict[str, str] = {
     "imaging.scene_center_z": "Scene center Z coordinate for beam pointing (spotlight/ScanSAR)",
     "imaging.n_subswaths": "Number of sub-swaths (ScanSAR mode)",
     "imaging.burst_length": "Pulses per burst (ScanSAR mode)",
+    "imaging.squint_angle": "Antenna squint angle from broadside (degrees). 0 = perpendicular to flight track",
     # Radar
     "radar.carrier_freq": "RF carrier frequency. Determines wavelength = c / f_c",
     "radar.transmit_power": "Peak transmit power at the antenna feed (W)",
     "radar.receiver_gain_dB": "Total receiver chain gain (dB)",
     "radar.system_losses": "Aggregate system losses: feed, radome, processing (dB)",
     "radar.noise_figure": "Receiver noise figure (dB). Lower = better sensitivity",
-    "radar.squint_angle": "Antenna squint angle from broadside (degrees)",
     "radar.reference_temp": "Reference noise temperature (K), typically 290 K",
     "radar.polarization": "Polarization mode: single (HH), dual (HH+HV), or quad",
     "radar.sample_rate_auto": "When checked, sample rate is auto-derived from bandwidth",
@@ -94,7 +91,6 @@ _TOOLTIPS: dict[str, str] = {
     "antenna.preset": "Antenna pattern type: flat, sinc, or Gaussian taper",
     "antenna.az_beamwidth": "Azimuth 3-dB beamwidth (degrees)",
     "antenna.el_beamwidth": "Elevation 3-dB beamwidth (degrees)",
-    "antenna.peak_gain_dB": "Peak antenna gain (dBi)",
     # Waveform
     "waveform.waveform_type": "Pulse type: LFM (pulsed chirp) or FMCW (continuous wave)",
     "waveform.bandwidth": "Chirp bandwidth — determines range resolution = c / (2B)",
@@ -145,30 +141,11 @@ _TOOLTIPS: dict[str, str] = {
 _BOLD_FONT = QFont()
 _BOLD_FONT.setBold(True)
 
-_ICONS_DIR = Path(__file__).resolve().parent.parent.parent / "assets" / "icons"
-
-_CATEGORY_ICONS: dict[str, str] = {
-    "Simulation": "simulation.svg",
-    "SAR Imaging": "sar_imaging.svg",
-    "Radar": "radar.svg",
-    "Antenna": "antenna.svg",
-    "Waveform": "waveform.svg",
-    "Platform": "platform.svg",
-    "Scene": "scene.svg",
-    "Processing": "processing.svg",
-}
-
-
 def _category_item(label: str) -> QTreeWidgetItem:
-    """Top-level bold category node with optional icon."""
+    """Top-level bold category node."""
     item = QTreeWidgetItem([label])
     item.setFont(0, _BOLD_FONT)
     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-    icon_file = _CATEGORY_ICONS.get(label)
-    if icon_file:
-        icon_path = _ICONS_DIR / icon_file
-        if icon_path.exists():
-            item.setIcon(0, QIcon(str(icon_path)))
     return item
 
 
@@ -217,12 +194,15 @@ class PointTargetDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_add = QPushButton("Add Target")
         btn_remove = QPushButton("Remove Selected")
+        btn_remove_all = QPushButton("Remove All")
         btn_row.addWidget(btn_add)
         btn_row.addWidget(btn_remove)
+        btn_row.addWidget(btn_remove_all)
         layout.addLayout(btn_row)
 
         btn_add.clicked.connect(self._add_row)
         btn_remove.clicked.connect(self._remove_selected)
+        btn_remove_all.clicked.connect(self._remove_all)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -251,6 +231,9 @@ class PointTargetDialog(QDialog):
         rows = sorted({idx.row() for idx in self._table.selectedIndexes()}, reverse=True)
         for r in rows:
             self._table.removeRow(r)
+
+    def _remove_all(self) -> None:
+        self._table.setRowCount(0)
 
     def get_targets(self) -> list[dict]:
         self._table.setCurrentItem(None)
@@ -323,6 +306,7 @@ class ParameterTreeWidget(QWidget):
         self._tree.setAlternatingRowColors(True)
         self._tree.setRootIsDecorated(True)
         self._tree.setAnimated(True)
+        self._tree.setIndentation(12)
         header = self._tree.header()
         if header is not None:
             header.setStretchLastSection(True)
@@ -345,6 +329,7 @@ class ParameterTreeWidget(QWidget):
 
         # Apply initial visibility rules
         self._on_waveform_type_changed(self._w("waveform.waveform_type").currentText())
+        self._on_window_changed(self._w("waveform.window").currentText())
         self._on_sample_rate_auto_toggled(self._w("radar.sample_rate_auto").isChecked())
         self._on_flight_path_mode_changed(self._w("platform.flight_path_mode").currentText())
         self._on_phase_noise_toggled(self._w("waveform.phase_noise_enabled").isChecked())
@@ -475,6 +460,11 @@ class ParameterTreeWidget(QWidget):
         self._register(cat, "imaging.depression_angle", "Depression Angle", w)
         self._connect_spin("imaging.depression_angle", w)
 
+        # squint_angle
+        w = _plain_spin(0.0, -90.0, 90.0, 1.0, "\u00b0")
+        self._register(cat, "imaging.squint_angle", "Squint Angle", w)
+        self._connect_spin("imaging.squint_angle", w)
+
         # scene_center (visible only for spotlight/ScanSAR)
         for axis, default in [("x", 0.0), ("y", 0.0), ("z", 0.0)]:
             w = UnitSpinBox(_DIST, "m", value=default, minimum=-1e8, maximum=1e8, step=10.0)
@@ -516,7 +506,7 @@ class ParameterTreeWidget(QWidget):
         self._connect_unit("radar.carrier_freq", w)
 
         # transmit_power
-        w = UnitSpinBox(_POWER, "W", value=1000.0, minimum=0.01, maximum=999999.0, step=100.0)
+        w = UnitSpinBox(_POWER, "W", value=1.0, minimum=0.01, maximum=999999.0, step=0.1)
         self._register(cat, "radar.transmit_power", "Transmit Power", w)
         self._connect_unit("radar.transmit_power", w)
 
@@ -534,11 +524,6 @@ class ParameterTreeWidget(QWidget):
         w = _plain_spin(3.0, 0.0, 30.0, 0.5, " dB")
         self._register(cat, "radar.noise_figure", "Noise Figure", w)
         self._connect_spin("radar.noise_figure", w)
-
-        # squint_angle
-        w = _plain_spin(0.0, -90.0, 90.0, 1.0, "\u00b0")
-        self._register(cat, "radar.squint_angle", "Squint Angle", w)
-        self._connect_spin("radar.squint_angle", w)
 
         # reference_temp
         w = _plain_spin(290.0, 1.0, 10000.0, 10.0, " K")
@@ -583,9 +568,7 @@ class ParameterTreeWidget(QWidget):
         self._register(cat, "antenna.el_beamwidth", "El Beamwidth", w)
         self._connect_spin("antenna.el_beamwidth", w)
 
-        w = _plain_spin(30.0, -30.0, 80.0, 1.0, " dB")
-        self._register(cat, "antenna.peak_gain_dB", "Peak Gain", w)
-        self._connect_spin("antenna.peak_gain_dB", w)
+
 
     # -----------------------------------------------------------------
     # 4. Waveform
@@ -631,6 +614,12 @@ class ParameterTreeWidget(QWidget):
         w = _combo(["(None)", "hamming", "hanning", "blackman", "kaiser"], "(None)")
         self._register(cat, "waveform.window", "Window", w)
         self._connect_combo("waveform.window", w)
+        w.currentTextChanged.connect(self._on_window_changed)
+
+        # kaiser beta (shown only when window == "kaiser")
+        w = _plain_spin(6.0, 0.0, 40.0, 0.5, "")
+        self._register(cat, "waveform.kaiser_beta", "Kaiser \u03b2", w)
+        self._connect_spin("waveform.kaiser_beta", w)
 
         # --- Phase Noise group ---
         grp = _group_item("Phase Noise")
@@ -639,7 +628,9 @@ class ParameterTreeWidget(QWidget):
 
         cb = QCheckBox()
         cb.setChecked(False)
-        self._register(grp, "waveform.phase_noise_enabled", "Enabled", cb)
+        self._tree.setItemWidget(grp, 1, cb)
+        self._widgets["waveform.phase_noise_enabled"] = cb
+        self._items["waveform.phase_noise_enabled"] = grp
         self._connect_check("waveform.phase_noise_enabled", cb)
         cb.toggled.connect(self._on_phase_noise_toggled)
 
@@ -659,6 +650,9 @@ class ParameterTreeWidget(QWidget):
         self._set_visible("waveform.duty_cycle", is_lfm)
         self._set_visible("waveform.fmcw_duty_cycle", not is_lfm)
         self._set_visible("waveform.ramp_type", not is_lfm)
+
+    def _on_window_changed(self, text: str) -> None:
+        self._set_visible("waveform.kaiser_beta", text == "kaiser")
 
     def _on_phase_noise_toggled(self, checked: bool) -> None:
         for suffix in ("flicker_fm", "white_fm", "flicker_pm", "white_floor"):
@@ -718,7 +712,9 @@ class ParameterTreeWidget(QWidget):
 
         cb = QCheckBox()
         cb.setChecked(False)
-        self._register(grp_turb, "platform.perturbation_enabled", "Enabled", cb)
+        self._tree.setItemWidget(grp_turb, 1, cb)
+        self._widgets["platform.perturbation_enabled"] = cb
+        self._items["platform.perturbation_enabled"] = grp_turb
         self._connect_check("platform.perturbation_enabled", cb)
         cb.toggled.connect(self._on_perturbation_toggled)
 
@@ -735,11 +731,13 @@ class ParameterTreeWidget(QWidget):
 
         cb = QCheckBox()
         cb.setChecked(False)
-        self._register(grp_gps, "platform.gps_enabled", "Enabled", cb)
+        self._tree.setItemWidget(grp_gps, 1, cb)
+        self._widgets["platform.gps_enabled"] = cb
+        self._items["platform.gps_enabled"] = grp_gps
         self._connect_check("platform.gps_enabled", cb)
         cb.toggled.connect(self._on_gps_toggled)
 
-        w = _plain_spin(0.02, 0.0, 100.0, 0.01, " m")
+        w = _plain_spin(0.002, 0.0, 100.0, 0.001, " m")
         self._register(grp_gps, "platform.gps_accuracy", "Accuracy", w)
         self._connect_spin("platform.gps_accuracy", w)
 
@@ -754,15 +752,17 @@ class ParameterTreeWidget(QWidget):
 
         cb = QCheckBox()
         cb.setChecked(False)
-        self._register(grp_imu, "platform.imu_enabled", "Enabled", cb)
+        self._tree.setItemWidget(grp_imu, 1, cb)
+        self._widgets["platform.imu_enabled"] = cb
+        self._items["platform.imu_enabled"] = grp_imu
         self._connect_check("platform.imu_enabled", cb)
         cb.toggled.connect(self._on_imu_toggled)
 
-        w = _plain_spin(0.0002, 0.0, 10.0, 0.0001, " m/s\u00b2/\u221aHz")
+        w = _plain_spin(0.0001, 0.0, 10.0, 0.0001, " m/s\u00b2/\u221aHz")
         self._register(grp_imu, "platform.accel_noise", "Accel Noise", w)
         self._connect_spin("platform.accel_noise", w)
 
-        w = _plain_spin(0.000005, 0.0, 1.0, 0.000001, " rad/s/\u221aHz")
+        w = _plain_spin(0.00001, 0.0, 1.0, 0.000001, " rad/s/\u221aHz")
         self._register(grp_imu, "platform.gyro_noise", "Gyro Noise", w)
         self._connect_spin("platform.gyro_noise", w)
 
@@ -778,17 +778,43 @@ class ParameterTreeWidget(QWidget):
         self._set_visible("platform.flight_time", not is_start_stop)
 
     def _on_perturbation_toggled(self, checked: bool) -> None:
-        for s in ("sigma_u", "sigma_v", "sigma_w"):
-            self._set_visible(f"platform.{s}", checked)
+        grp = self._items["platform.turbulence"]
+        for i in range(grp.childCount()):
+            child = grp.child(i)
+            if child is not None:
+                child.setHidden(not checked)
 
     def _on_gps_toggled(self, checked: bool) -> None:
-        self._set_visible("platform.gps_accuracy", checked)
-        self._set_visible("platform.gps_rate", checked)
+        grp = self._items["platform.gps_group"]
+        for i in range(grp.childCount()):
+            child = grp.child(i)
+            if child is not None:
+                child.setHidden(not checked)
 
     def _on_imu_toggled(self, checked: bool) -> None:
-        self._set_visible("platform.accel_noise", checked)
-        self._set_visible("platform.gyro_noise", checked)
-        self._set_visible("platform.imu_rate", checked)
+        grp = self._items["platform.imu_group"]
+        for i in range(grp.childCount()):
+            child = grp.child(i)
+            if child is not None:
+                child.setHidden(not checked)
+
+    def _on_proc_step_toggled(self, step_key: str, checked: bool) -> None:
+        """Show/hide algorithm combo and params for an optional processing step."""
+        parent_item = self._items[f"processing.{step_key}"]
+        for i in range(parent_item.childCount()):
+            child = parent_item.child(i)
+            if child is not None:
+                child.setHidden(not checked)
+
+    def _on_moco_toggled(self, checked: bool) -> None:
+        """Auto-enable perturbation and GPS when MoCo is enabled."""
+        if checked:
+            perturb_cb = self._w("platform.perturbation_enabled")
+            if not perturb_cb.isChecked():
+                perturb_cb.setChecked(True)
+            gps_cb = self._w("platform.gps_enabled")
+            if not gps_cb.isChecked():
+                gps_cb.setChecked(True)
 
     # -----------------------------------------------------------------
     # 6. Scene
@@ -974,7 +1000,7 @@ class ParameterTreeWidget(QWidget):
     # -----------------------------------------------------------------
 
     _PROC_STEPS: list[tuple[str, str, bool]] = [
-        ("image_formation", "Image Formation", False),   # required — no (None)
+        ("image_formation", "Image Formation", False),   # required — no checkbox
         ("moco", "Motion Compensation", True),
         ("autofocus", "Autofocus", True),
         ("geocoding", "Geocoding", True),
@@ -1002,29 +1028,59 @@ class ParameterTreeWidget(QWidget):
 
             schema_key = self._SCHEMA_KEY_MAP[step_key]
             algo_names = list(ALGORITHM_SCHEMAS.get(schema_key, {}).keys())
-            choices = (["(None)"] + algo_names) if optional else algo_names
-            default = "(None)" if optional else (algo_names[0] if algo_names else "")
+            default_algo = algo_names[0] if algo_names else ""
 
-            combo = _combo(choices, default)
-            combo_item = _param_item("Algorithm")
-            item.addChild(combo_item)
-            self._tree.setItemWidget(combo_item, 1, combo)
-            key = f"processing.{step_key}"
-            self._widgets[key] = combo
-            self._items[f"processing.{step_key}_combo"] = combo_item
+            if optional:
+                # Checkbox on the group row, combo as first child
+                cb = QCheckBox()
+                cb.setChecked(False)
+                self._tree.setItemWidget(item, 1, cb)
+                self._widgets[f"processing.{step_key}_enabled"] = cb
+                self._items[f"processing.{step_key}_enabled"] = item
 
-            # Connect: on change, rebuild child params
-            combo.currentTextChanged.connect(
-                lambda text, sk=step_key: self._on_algo_changed(sk, text)
-            )
+                combo = _combo(algo_names, default_algo)
+                combo_item = _param_item("Algorithm")
+                item.addChild(combo_item)
+                self._tree.setItemWidget(combo_item, 1, combo)
+                key = f"processing.{step_key}"
+                self._widgets[key] = combo
+                self._items[f"processing.{step_key}_combo"] = combo_item
 
-            # Load initial algorithm params
-            self._on_algo_changed(step_key, default)
+                # Toggle visibility of combo + params when checkbox changes
+                cb.toggled.connect(
+                    lambda checked, sk=step_key: self._on_proc_step_toggled(sk, checked)
+                )
+
+                # Connect combo change to rebuild child params
+                combo.currentTextChanged.connect(
+                    lambda text, sk=step_key: self._on_algo_changed(sk, text)
+                )
+
+                # Auto-enable perturbation + GPS when MoCo is enabled
+                if step_key == "moco":
+                    cb.toggled.connect(self._on_moco_toggled)
+
+                # Initial state: unchecked, children hidden
+                self._on_algo_changed(step_key, default_algo)
+                self._on_proc_step_toggled(step_key, False)
+            else:
+                # Required step: just a combo, no checkbox
+                combo = _combo(algo_names, default_algo)
+                combo_item = _param_item("Algorithm")
+                item.addChild(combo_item)
+                self._tree.setItemWidget(combo_item, 1, combo)
+                key = f"processing.{step_key}"
+                self._widgets[key] = combo
+                self._items[f"processing.{step_key}_combo"] = combo_item
+
+                combo.currentTextChanged.connect(
+                    lambda text, sk=step_key: self._on_algo_changed(sk, text)
+                )
+                self._on_algo_changed(step_key, default_algo)
 
     def _on_algo_changed(self, step_key: str, algo_name: str) -> None:
         """Remove old param children and create new ones from schema."""
         parent_item = self._items[f"processing.{step_key}"]
-        combo_item = self._items[f"processing.{step_key}_combo"]
 
         # Remove all children except the combo item (always first child)
         while parent_item.childCount() > 1:
@@ -1052,6 +1108,7 @@ class ParameterTreeWidget(QWidget):
         params = ALGORITHM_SCHEMAS.get(schema_key, {}).get(algo_name, [])
         for pdef in params:
             pname = pdef["name"]
+            plabel = pdef.get("label", pname)
             ptype = pdef.get("type", "float")
             pdefault = pdef.get("default", 0)
             full_key = f"processing.{step_key}_params.{pname}"
@@ -1059,7 +1116,7 @@ class ParameterTreeWidget(QWidget):
             if ptype == "bool":
                 w = QCheckBox()
                 w.setChecked(bool(pdefault))
-                self._register(parent_item, full_key, pname, w)
+                self._register(parent_item, full_key, plabel, w)
                 self._connect_check(full_key, w)
             elif ptype == "int":
                 w = _int_spin(
@@ -1067,12 +1124,12 @@ class ParameterTreeWidget(QWidget):
                     int(pdef.get("min", 0)),
                     int(pdef.get("max", 10_000_000)),
                 )
-                self._register(parent_item, full_key, pname, w)
+                self._register(parent_item, full_key, plabel, w)
                 self._connect_spin(full_key, w)
             elif ptype == "enum":
                 choices = pdef.get("choices", [])
                 w = _combo(choices, str(pdefault))
-                self._register(parent_item, full_key, pname, w)
+                self._register(parent_item, full_key, plabel, w)
                 self._connect_combo(full_key, w)
             else:
                 # float
@@ -1083,7 +1140,7 @@ class ParameterTreeWidget(QWidget):
                     1.0,
                     f" {pdef['unit']}" if pdef.get("unit") else "",
                 )
-                self._register(parent_item, full_key, pname, w)
+                self._register(parent_item, full_key, plabel, w)
                 self._connect_spin(full_key, w)
 
     # =================================================================
@@ -1109,6 +1166,7 @@ class ParameterTreeWidget(QWidget):
             "mode": self._w("imaging.mode").currentText(),
             "look_side": self._w("imaging.look_side").currentText(),
             "depression_angle": math.radians(self._w("imaging.depression_angle").value()),
+            "squint_angle": math.radians(self._w("imaging.squint_angle").value()),
             "scene_center": [
                 self._w("imaging.scene_center_x").si_value(),
                 self._w("imaging.scene_center_y").si_value(),
@@ -1125,7 +1183,6 @@ class ParameterTreeWidget(QWidget):
             "receiver_gain_dB": self._w("radar.receiver_gain_dB").value(),
             "system_losses": self._w("radar.system_losses").value(),
             "noise_figure": self._w("radar.noise_figure").value(),
-            "squint_angle": math.radians(self._w("radar.squint_angle").value()),
             "reference_temp": self._w("radar.reference_temp").value(),
             "polarization": self._w("radar.polarization").currentText(),
         }
@@ -1135,7 +1192,6 @@ class ParameterTreeWidget(QWidget):
             "preset": self._w("antenna.preset").currentText(),
             "az_beamwidth": math.radians(self._w("antenna.az_beamwidth").value()),
             "el_beamwidth": math.radians(self._w("antenna.el_beamwidth").value()),
-            "peak_gain_dB": self._w("antenna.peak_gain_dB").value(),
         }
 
         # --- waveform ---
@@ -1147,6 +1203,8 @@ class ParameterTreeWidget(QWidget):
             "bandwidth": self._w("waveform.bandwidth").si_value(),
             "window": None if window_text == "(None)" else window_text,
         }
+        if window_text == "kaiser":
+            waveform["kaiser_beta"] = self._w("waveform.kaiser_beta").value()
         if wtype == "LFM":
             waveform["duty_cycle"] = self._w("waveform.duty_cycle").value()
         elif wtype == "FMCW":
@@ -1254,7 +1312,12 @@ class ParameterTreeWidget(QWidget):
             combo: QComboBox = self._w(f"processing.{step_key}")
             algo = combo.currentText()
             if optional:
-                processing_config[step_key] = None if algo == "(None)" else algo
+                enabled_key = f"processing.{step_key}_enabled"
+                cb = self._widgets.get(enabled_key)
+                if cb is not None and not cb.isChecked():
+                    processing_config[step_key] = None
+                else:
+                    processing_config[step_key] = algo
             else:
                 processing_config[step_key] = algo
 
@@ -1341,6 +1404,8 @@ class ParameterTreeWidget(QWidget):
                 self._w("imaging.scene_center_x").set_si_value(sc[0])
                 self._w("imaging.scene_center_y").set_si_value(sc[1])
                 self._w("imaging.scene_center_z").set_si_value(sc[2])
+        if "squint_angle" in p:
+            self._w("imaging.squint_angle").setValue(math.degrees(p["squint_angle"]))
         if "n_subswaths" in p:
             self._w("imaging.n_subswaths").setValue(p["n_subswaths"])
         if "burst_length" in p:
@@ -1359,8 +1424,6 @@ class ParameterTreeWidget(QWidget):
             self._w("radar.system_losses").setValue(p["system_losses"])
         if "noise_figure" in p:
             self._w("radar.noise_figure").setValue(p["noise_figure"])
-        if "squint_angle" in p:
-            self._w("radar.squint_angle").setValue(math.degrees(p["squint_angle"]))
         if "reference_temp" in p:
             self._w("radar.reference_temp").setValue(p["reference_temp"])
         if "polarization" in p:
@@ -1375,8 +1438,6 @@ class ParameterTreeWidget(QWidget):
             self._w("antenna.az_beamwidth").setValue(math.degrees(p["az_beamwidth"]))
         if "el_beamwidth" in p:
             self._w("antenna.el_beamwidth").setValue(math.degrees(p["el_beamwidth"]))
-        if "peak_gain_dB" in p:
-            self._w("antenna.peak_gain_dB").setValue(p["peak_gain_dB"])
 
     def _set_waveform(self, p: dict) -> None:
         if not p:
@@ -1398,16 +1459,17 @@ class ParameterTreeWidget(QWidget):
         if "window" in p:
             w = p["window"]
             self._w("waveform.window").setCurrentText("(None)" if w is None else str(w))
+        if "kaiser_beta" in p:
+            self._w("waveform.kaiser_beta").setValue(p["kaiser_beta"])
         if "phase_noise" in p:
             pn = p["phase_noise"]
+            enabled = p.get("phase_noise_enabled", pn is not None)
+            self._w("waveform.phase_noise_enabled").setChecked(enabled)
             if pn is not None:
-                self._w("waveform.phase_noise_enabled").setChecked(True)
                 self._w("waveform.flicker_fm").setValue(pn.get("flicker_fm_level", -80.0))
                 self._w("waveform.white_fm").setValue(pn.get("white_fm_level", -100.0))
                 self._w("waveform.flicker_pm").setValue(pn.get("flicker_pm_level", -120.0))
                 self._w("waveform.white_floor").setValue(pn.get("white_floor", -150.0))
-            else:
-                self._w("waveform.phase_noise_enabled").setChecked(False)
 
     def _set_platform(self, p: dict) -> None:
         if not p:
@@ -1442,30 +1504,27 @@ class ParameterTreeWidget(QWidget):
             self._w("platform.flight_time").setValue(p["flight_time"])
         if "perturbation" in p:
             pt = p["perturbation"]
+            enabled = p.get("perturbation_enabled", pt is not None)
+            self._w("platform.perturbation_enabled").setChecked(enabled)
             if pt is not None:
-                self._w("platform.perturbation_enabled").setChecked(True)
                 self._w("platform.sigma_u").setValue(pt.get("sigma_u", 1.0))
                 self._w("platform.sigma_v").setValue(pt.get("sigma_v", 1.0))
                 self._w("platform.sigma_w").setValue(pt.get("sigma_w", 0.5))
-            else:
-                self._w("platform.perturbation_enabled").setChecked(False)
         if "gps" in p:
             g = p["gps"]
+            enabled = p.get("gps_enabled", g is not None)
+            self._w("platform.gps_enabled").setChecked(enabled)
             if g is not None:
-                self._w("platform.gps_enabled").setChecked(True)
-                self._w("platform.gps_accuracy").setValue(g.get("accuracy", 0.02))
+                self._w("platform.gps_accuracy").setValue(g.get("accuracy", 0.002))
                 self._w("platform.gps_rate").setValue(g.get("rate", 10.0))
-            else:
-                self._w("platform.gps_enabled").setChecked(False)
         if "imu" in p:
-            i = p["imu"]
-            if i is not None:
-                self._w("platform.imu_enabled").setChecked(True)
-                self._w("platform.accel_noise").setValue(i.get("accel_noise", 0.0002))
-                self._w("platform.gyro_noise").setValue(i.get("gyro_noise", 0.000005))
-                self._w("platform.imu_rate").setValue(i.get("rate", 200.0))
-            else:
-                self._w("platform.imu_enabled").setChecked(False)
+            im = p["imu"]
+            enabled = p.get("imu_enabled", im is not None)
+            self._w("platform.imu_enabled").setChecked(enabled)
+            if im is not None:
+                self._w("platform.accel_noise").setValue(im.get("accel_noise", 0.0001))
+                self._w("platform.gyro_noise").setValue(im.get("gyro_noise", 0.00001))
+                self._w("platform.imu_rate").setValue(im.get("rate", 200.0))
 
     def _set_scene(self, p: dict) -> None:
         if not p:
@@ -1510,8 +1569,16 @@ class ParameterTreeWidget(QWidget):
             if step_key in p:
                 algo = p[step_key]
                 combo: QComboBox = self._w(f"processing.{step_key}")
-                if algo is None and optional:
-                    combo.setCurrentText("(None)")
+                if optional:
+                    enabled_key = f"processing.{step_key}_enabled"
+                    cb = self._widgets.get(enabled_key)
+                    if algo is None:
+                        if cb is not None:
+                            cb.setChecked(False)
+                    else:
+                        if cb is not None:
+                            cb.setChecked(True)
+                        combo.setCurrentText(str(algo))
                 elif algo is not None:
                     combo.setCurrentText(str(algo))
 
@@ -1585,12 +1652,18 @@ class ParameterTreeWidget(QWidget):
 
         # Re-apply conditional visibility
         self._on_waveform_type_changed(self._w("waveform.waveform_type").currentText())
+        self._on_window_changed(self._w("waveform.window").currentText())
         self._on_sample_rate_auto_toggled(self._w("radar.sample_rate_auto").isChecked())
         self._on_flight_path_mode_changed(self._w("platform.flight_path_mode").currentText())
         self._on_phase_noise_toggled(self._w("waveform.phase_noise_enabled").isChecked())
         self._on_perturbation_toggled(self._w("platform.perturbation_enabled").isChecked())
         self._on_gps_toggled(self._w("platform.gps_enabled").isChecked())
         self._on_imu_toggled(self._w("platform.imu_enabled").isChecked())
+        for step_key, _label, optional in self._PROC_STEPS:
+            if optional:
+                cb = self._widgets.get(f"processing.{step_key}_enabled")
+                if cb is not None:
+                    self._on_proc_step_toggled(step_key, cb.isChecked())
 
     def _filter_item(self, item: QTreeWidgetItem, text: str) -> bool:
         """Recursively filter. Returns True if item or any child matches."""

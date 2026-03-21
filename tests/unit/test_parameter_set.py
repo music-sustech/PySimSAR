@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import json
-import os
-from pathlib import Path
 
 import numpy as np
 import pytest
 
 from pySimSAR.io.parameter_set import (
-    resolve_refs,
-    load_parameter_set,
     build_simulation,
+    load_parameter_set,
+    resolve_refs,
     save_parameter_set,
 )
 
@@ -36,7 +34,6 @@ def tmp_project(tmp_path):
         "preset": "flat",
         "az_beamwidth_deg": 3.0,
         "el_beamwidth_deg": 10.0,
-        "peak_gain_dB": 30.0,
     }
     _write(tmp_path / "antenna.json", antenna)
 
@@ -44,13 +41,12 @@ def tmp_project(tmp_path):
     radar = {
         "carrier_freq_hz": 9.65e9,
         "prf_hz": 1000.0,
-        "transmit_power_w": 1000.0,
-        "receiver_gain_dB": 0.0,
+        "transmit_power_w": 1.0,
+        "receiver_gain_dB": 30.0,
         "noise_figure_dB": 3.0,
         "system_losses_dB": 2.0,
         "reference_temp_K": 290.0,
         "polarization": "single",
-        "squint_angle_deg": 0.0,
         "waveform": {"$ref": "waveform.json"},
         "antenna": {"$ref": "antenna.json"},
     }
@@ -61,6 +57,7 @@ def tmp_project(tmp_path):
         "mode": "stripmap",
         "look_side": "right",
         "depression_angle_deg": 45.0,
+        "squint_angle_deg": 0.0,
         "scene_center_m": None,
         "n_subswaths": 3,
         "burst_length": 20,
@@ -89,6 +86,8 @@ def tmp_project(tmp_path):
         "altitude_m": 2000.0,
         "heading_deg": 0.0,
         "start_position_m": [0, -12.8, 2000],
+        "flight_path_mode": "heading_time",
+        "flight_time": 0.256,
         "perturbation": None,
         "sensors": None,
     }
@@ -104,7 +103,6 @@ def tmp_project(tmp_path):
         "sarmode": {"$ref": "sarmode.json"},
         "platform": {"$ref": "platform.json"},
         "simulation": {
-            "n_pulses": 256,
             "seed": 42,
             "sample_rate_hz": None,
         },
@@ -286,9 +284,10 @@ class TestBuildSimulation:
         assert sim["radar"].carrier_freq == pytest.approx(9.65e9)
 
     def test_engine_kwargs(self, tmp_project):
-        """Engine kwargs contain n_pulses and seed."""
+        """Engine kwargs contain n_pulses (derived from flight_time × PRF) and seed."""
         params = load_parameter_set(tmp_project)
         sim = build_simulation(params)
+        # 0.256 s × 1000 Hz PRF = 256 pulses
         assert sim["engine_kwargs"]["n_pulses"] == 256
         assert sim["engine_kwargs"]["seed"] == 42
 
@@ -331,7 +330,6 @@ class TestSaveParameterSet:
             scene=sim["scene"],
             radar=sim["radar"],
             platform=sim["platform"],
-            n_pulses=sim["engine_kwargs"]["n_pulses"],
             seed=sim["engine_kwargs"]["seed"],
             name="Round-trip test",
         )
@@ -342,7 +340,6 @@ class TestSaveParameterSet:
 
         assert len(sim2["scene"].point_targets) == len(sim["scene"].point_targets)
         assert sim2["radar"].carrier_freq == pytest.approx(sim["radar"].carrier_freq)
-        assert sim2["engine_kwargs"]["n_pulses"] == sim["engine_kwargs"]["n_pulses"]
 
     def test_creates_project_json(self, tmp_project, tmp_path):
         """Save creates project.json."""
@@ -355,7 +352,6 @@ class TestSaveParameterSet:
             scene=sim["scene"],
             radar=sim["radar"],
             platform=sim["platform"],
-            n_pulses=256,
             seed=42,
         )
 
@@ -365,8 +361,8 @@ class TestSaveParameterSet:
 
     def test_inline_vs_bulk_threshold(self, tmp_path):
         """<= 20 targets: inline. > 20 targets: .npy files."""
-        from pySimSAR.core.scene import PointTarget, Scene
         from pySimSAR.core.radar import Radar, create_antenna_from_preset
+        from pySimSAR.core.scene import PointTarget, Scene
         from pySimSAR.waveforms.lfm import LFMWaveform
 
         # Create scene with 25 targets
@@ -385,7 +381,7 @@ class TestSaveParameterSet:
         save_dir = tmp_path / "bulk"
         save_parameter_set(
             save_dir, scene=scene, radar=radar, platform=None,
-            n_pulses=256, seed=42,
+            seed=42,
         )
 
         # Should have .npy files for bulk targets
@@ -410,7 +406,6 @@ class TestSaveParameterSet:
             scene=sim["scene"],
             radar=sim["radar"],
             platform=sim["platform"],
-            n_pulses=256,
             seed=42,
             processing_config=pc,
         )

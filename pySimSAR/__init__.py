@@ -5,28 +5,27 @@ simulation, image formation, and data I/O in a single convenient namespace.
 """
 
 # Core data types
-from pySimSAR.core.types import RawData, SARImage, PhaseHistoryData
-
-# Scene model
-from pySimSAR.core.scene import Scene, PointTarget, DistributedTarget
-
-# Radar and antenna
-from pySimSAR.core.radar import Radar, AntennaPattern, create_antenna_from_preset
-
 # Platform
 from pySimSAR.core.platform import Platform
 
-# Simulation engine
-from pySimSAR.simulation.engine import SimulationEngine, SimulationResult
+# Radar and antenna
+from pySimSAR.core.radar import AntennaPattern, Radar, create_antenna_from_preset
 
-# Processing pipeline
-from pySimSAR.pipeline.runner import PipelineRunner, PipelineResult
+# Scene model
+from pySimSAR.core.scene import DistributedTarget, PointTarget, Scene
+from pySimSAR.core.types import PhaseHistoryData, RawData, SARImage
 
 # Configuration
-from pySimSAR.io.config import SimulationConfig, ProcessingConfig
+from pySimSAR.io.config import ProcessingConfig, SimulationConfig
 
 # HDF5 I/O
-from pySimSAR.io.hdf5_format import write_hdf5, read_hdf5, import_data
+from pySimSAR.io.hdf5_format import import_data, read_hdf5, write_hdf5
+
+# Processing pipeline
+from pySimSAR.pipeline.runner import PipelineResult, PipelineRunner
+
+# Simulation engine
+from pySimSAR.simulation.engine import SimulationEngine, SimulationResult
 
 __all__ = [
     # Core types

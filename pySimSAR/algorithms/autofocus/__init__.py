@@ -13,9 +13,9 @@ from pySimSAR.algorithms.registry import AlgorithmRegistry
 autofocus_registry = AlgorithmRegistry(AutofocusAlgorithm, "autofocus")
 
 # Register default algorithms
-from pySimSAR.algorithms.autofocus.pga import PhaseGradientAutofocus
 from pySimSAR.algorithms.autofocus.mda import MapDriftAutofocus
 from pySimSAR.algorithms.autofocus.min_entropy import MinimumEntropyAutofocus
+from pySimSAR.algorithms.autofocus.pga import PhaseGradientAutofocus
 from pySimSAR.algorithms.autofocus.ppp import ProminentPointProcessing
 
 autofocus_registry.register(PhaseGradientAutofocus)

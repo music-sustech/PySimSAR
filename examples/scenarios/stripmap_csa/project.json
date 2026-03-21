@@ -1,0 +1,28 @@
+{
+  "format_version": "1.0",
+  "name": "Stripmap CSA",
+  "description": "Chirp Scaling Algorithm validation",
+  "scene": {
+    "$ref": "scene.json"
+  },
+  "radar": {
+    "$ref": "radar.json"
+  },
+  "sarmode": {
+    "$ref": "sarmode.json"
+  },
+  "platform": {
+    "$ref": "platform.json"
+  },
+  "simulation": {
+    "seed": 42,
+    "sample_rate_hz": null,
+    "swath_range_m": [
+      1350.0,
+      1500.0
+    ]
+  },
+  "processing": {
+    "$ref": "processing.json"
+  }
+}

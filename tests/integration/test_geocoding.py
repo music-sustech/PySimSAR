@@ -9,11 +9,10 @@ from __future__ import annotations
 import math
 
 import numpy as np
-import pytest
 
-from pySimSAR.algorithms.geocoding.slant_to_ground import SlantToGroundRange
 from pySimSAR.algorithms.geocoding.georeferencing import Georeferencing
-from pySimSAR.core.radar import AntennaPattern, Radar, C_LIGHT
+from pySimSAR.algorithms.geocoding.slant_to_ground import SlantToGroundRange
+from pySimSAR.core.radar import C_LIGHT, AntennaPattern, Radar
 from pySimSAR.core.types import ImageGeometry, SARImage
 from pySimSAR.motion.trajectory import Trajectory
 from pySimSAR.waveforms.lfm import LFMWaveform
@@ -36,7 +35,6 @@ def _make_radar_and_trajectory(
         pattern_2d=lambda az, el: 30.0,
         az_beamwidth=math.radians(3.0),
         el_beamwidth=math.radians(5.0),
-        peak_gain_dB=30.0,
     )
     radar = Radar(
         carrier_freq=carrier_freq,
@@ -216,7 +214,6 @@ class TestGeoreferencing:
         """A target at known ENU position should map to correct lat/lon offset."""
         altitude = 5000.0
         depression_deg = 45.0
-        depression_rad = math.radians(depression_deg)
         radar, trajectory = _make_radar_and_trajectory(
             altitude=altitude, depression_angle_deg=depression_deg,
             n_pulses=64, velocity=100.0,

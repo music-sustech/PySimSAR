@@ -1,5 +1,5 @@
 """Processing pipeline orchestration."""
 
-from pySimSAR.pipeline.runner import PipelineRunner, PipelineResult
+from pySimSAR.pipeline.runner import PipelineResult, PipelineRunner
 
 __all__ = ["PipelineRunner", "PipelineResult"]

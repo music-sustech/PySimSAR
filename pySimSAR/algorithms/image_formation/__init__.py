@@ -8,9 +8,9 @@ image_formation_registry = AlgorithmRegistry(
 )
 
 # Register default algorithms
-from pySimSAR.algorithms.image_formation.range_doppler import RangeDopplerAlgorithm
 from pySimSAR.algorithms.image_formation.chirp_scaling import ChirpScalingAlgorithm
 from pySimSAR.algorithms.image_formation.omega_k import OmegaKAlgorithm
+from pySimSAR.algorithms.image_formation.range_doppler import RangeDopplerAlgorithm
 
 image_formation_registry.register(RangeDopplerAlgorithm)
 image_formation_registry.register(ChirpScalingAlgorithm)

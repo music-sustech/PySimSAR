@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pySimSAR.core.radar import AntennaPattern, C_LIGHT, Radar
+from pySimSAR.core.radar import C_LIGHT, AntennaPattern, Radar
 from pySimSAR.core.scene import PointTarget
 from pySimSAR.waveforms.lfm import LFMWaveform
 
@@ -24,7 +24,6 @@ def _make_antenna() -> AntennaPattern:
         pattern_2d=pattern,
         az_beamwidth=np.radians(10),
         el_beamwidth=np.radians(10),
-        peak_gain_dB=0.0,
         az_angles=az,
         el_angles=el,
     )
@@ -61,7 +60,6 @@ class TestEchoPhaseAccuracy:
         """Echo phase from a single point target matches -4*pi*fc*R/c."""
         # Target at known range
         target_range = 5000.0  # meters
-        target = PointTarget(position=[target_range, 0, 0], rcs=1.0)
 
         # Expected phase from the range equation
         expected_phase = -4 * np.pi * radar.carrier_freq * target_range / C_LIGHT

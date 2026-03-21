@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 
 import numpy as np
 import pytest
 
-from pySimSAR.core.types import RawData, PhaseHistoryData, SARImage
-from pySimSAR.io.hdf5_format import write_hdf5, read_hdf5
+from pySimSAR.core.types import RawData, SARImage
+from pySimSAR.io.hdf5_format import read_hdf5, write_hdf5
 from pySimSAR.motion.trajectory import Trajectory
 from pySimSAR.sensors.nav_data import NavigationData
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -333,9 +330,9 @@ class TestConfigSerialization:
 
     def test_simulation_config_to_json(self):
         """SimulationConfig serializes to valid JSON."""
-        from pySimSAR.io.config import SimulationConfig
+        from pySimSAR.core.radar import AntennaPattern, Radar
         from pySimSAR.core.scene import Scene
-        from pySimSAR.core.radar import Radar, AntennaPattern
+        from pySimSAR.io.config import SimulationConfig
         from pySimSAR.waveforms.lfm import LFMWaveform
 
         scene = Scene(origin_lat=40.0, origin_lon=-74.0, origin_alt=0.0)
@@ -346,7 +343,7 @@ class TestConfigSerialization:
 
         antenna = AntennaPattern(
             pattern_2d=sinc_pattern,
-            az_beamwidth=0.05, el_beamwidth=0.17, peak_gain_dB=30.0,
+            az_beamwidth=0.05, el_beamwidth=0.17,
         )
         radar = Radar(
             carrier_freq=9.6e9, transmit_power=1000.0, antenna=antenna,

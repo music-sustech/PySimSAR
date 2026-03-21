@@ -1,9 +1,18 @@
 """Doppler spectrum visualization panel."""
 from __future__ import annotations
+
 import numpy as np
-from PyQt6.QtWidgets import QVBoxLayout, QWidget, QHBoxLayout, QLabel, QSpinBox, QComboBox
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
+
 
 class DopplerSpectrumPanel(QWidget):
     def __init__(self, parent=None):
@@ -26,7 +35,10 @@ class DopplerSpectrumPanel(QWidget):
         self._fig = Figure(figsize=(5, 3), tight_layout=True)
         self._canvas = FigureCanvasQTAgg(self._fig)
         self._ax = self._fig.add_subplot(111)
-        self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+        self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
         layout.addWidget(self._canvas)
 
         self._raw_data = None
@@ -44,7 +56,10 @@ class DopplerSpectrumPanel(QWidget):
     def _refresh(self):
         self._ax.clear()
         if self._raw_data is None:
-            self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+            self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
             self._canvas.draw_idle()
             return
         rg = self._rg_spin.value()
@@ -73,5 +88,8 @@ class DopplerSpectrumPanel(QWidget):
         self._raw_data = None
         self._radar = None
         self._ax.clear()
-        self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+        self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
         self._canvas.draw_idle()

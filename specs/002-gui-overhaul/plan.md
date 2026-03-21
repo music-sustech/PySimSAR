@@ -61,7 +61,7 @@ pySimSAR/
 │   └── calculator.py              # NEW: SARCalculator (library layer)
 ├── assets/
 │   ├── models/aircraft.obj        # NEW: Low-poly aircraft 3D model
-│   └── icons/                     # NEW: Tree category icons (SVG/PNG)
+│   └── icons/                     # (reserved for future use)
 ├── gui/
 │   ├── app.py                     # MODIFIED: New layout (tree | viz+calc | statusbar)
 │   ├── widgets/

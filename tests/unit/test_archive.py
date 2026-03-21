@@ -1,8 +1,10 @@
 import json
-from pathlib import Path
+
 import numpy as np
 import pytest
+
 from pySimSAR.io.archive import pack_project, unpack_project
+
 
 def test_roundtrip(tmp_path):
     """Pack a project dir, unpack to new location, verify all files identical."""

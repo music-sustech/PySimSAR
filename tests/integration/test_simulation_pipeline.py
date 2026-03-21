@@ -10,21 +10,20 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pySimSAR.core.radar import AntennaPattern, C_LIGHT, Radar
+from pySimSAR.core.radar import C_LIGHT, AntennaPattern, Radar
 from pySimSAR.core.scene import PointTarget, Scene
 from pySimSAR.simulation.engine import SimulationEngine
 
 
-def _make_isotropic_antenna(peak_gain_dB: float = 30.0) -> AntennaPattern:
+def _make_isotropic_antenna() -> AntennaPattern:
     """Create an isotropic antenna pattern for testing."""
     az = np.linspace(-np.pi, np.pi, 5)
     el = np.linspace(-np.pi / 2, np.pi / 2, 5)
-    pattern = np.full((len(el), len(az)), peak_gain_dB)
+    pattern = np.full((len(el), len(az)), 30.0)
     return AntennaPattern(
         pattern_2d=pattern,
         az_beamwidth=np.radians(10),
         el_beamwidth=np.radians(10),
-        peak_gain_dB=peak_gain_dB,
         az_angles=az,
         el_angles=el,
     )
@@ -444,7 +443,6 @@ def _simulate_for_pipeline(n_pulses: int = 128) -> tuple:
 
     Returns data ready for PipelineRunner.
     """
-    from pySimSAR.waveforms.lfm import LFMWaveform
     from pySimSAR.core.types import RawData
     from pySimSAR.motion.trajectory import Trajectory
 
@@ -494,9 +492,9 @@ class TestPipelineRunner:
 
     def test_minimal_pipeline_image_formation_only(self):
         """Pipeline with only image formation produces a focused image."""
+        from pySimSAR.core.types import SARImage
         from pySimSAR.io.config import ProcessingConfig
         from pySimSAR.pipeline.runner import PipelineRunner
-        from pySimSAR.core.types import SARImage
 
         raw_data, radar, trajectory = _simulate_for_pipeline(n_pulses=128)
 
@@ -648,8 +646,7 @@ class TestDataImport:
     def test_import_round_trip(self, tmp_path):
         """Simulate → save HDF5 → import → verify data matches."""
         from pySimSAR.core.types import RawData
-        from pySimSAR.io.hdf5_format import write_hdf5, import_data
-        from pySimSAR.motion.trajectory import Trajectory
+        from pySimSAR.io.hdf5_format import import_data, write_hdf5
 
         raw_data, radar, trajectory = _simulate_for_pipeline(n_pulses=64)
 
@@ -677,7 +674,7 @@ class TestDataImport:
 
     def test_import_no_raw_data_raises(self, tmp_path):
         """Importing a file with no raw data raises ValueError."""
-        from pySimSAR.io.hdf5_format import write_hdf5, import_data
+        from pySimSAR.io.hdf5_format import import_data, write_hdf5
 
         filepath = tmp_path / "empty.h5"
         write_hdf5(filepath)  # no raw_data
@@ -696,9 +693,9 @@ class TestModeValidation:
 
     def test_incompatible_mode_raises_value_error(self):
         """Range-Doppler only supports stripmap; spotlight data should raise."""
+        from pySimSAR.core.types import RawData
         from pySimSAR.io.config import ProcessingConfig
         from pySimSAR.pipeline.runner import PipelineRunner
-        from pySimSAR.core.types import RawData
 
         # Create minimal raw data tagged as spotlight mode
         raw_data = {
@@ -724,9 +721,9 @@ class TestModeValidation:
 
     def test_compatible_mode_does_not_raise(self):
         """Stripmap data with range-Doppler should not raise."""
+        from pySimSAR.core.types import RawData
         from pySimSAR.io.config import ProcessingConfig
         from pySimSAR.pipeline.runner import PipelineRunner
-        from pySimSAR.core.types import RawData
 
         raw_data = {
             "single": RawData(
@@ -750,9 +747,9 @@ class TestModeValidation:
 
     def test_omega_k_rejects_scanmar(self):
         """Omega-K supports stripmap+spotlight but not scanmar."""
+        from pySimSAR.core.types import RawData
         from pySimSAR.io.config import ProcessingConfig
         from pySimSAR.pipeline.runner import PipelineRunner
-        from pySimSAR.core.types import RawData
 
         raw_data = {
             "single": RawData(
@@ -802,10 +799,10 @@ class TestPolarimetricValidation:
 
     def test_polsar_with_quad_pol_does_not_raise(self):
         """Quad-pol data with polarimetric decomposition should succeed."""
-        from pySimSAR.io.config import ProcessingConfig
-        from pySimSAR.pipeline.runner import PipelineRunner
         from pySimSAR.core.types import RawData
+        from pySimSAR.io.config import ProcessingConfig
         from pySimSAR.motion.trajectory import Trajectory
+        from pySimSAR.pipeline.runner import PipelineRunner
         from pySimSAR.waveforms.lfm import LFMWaveform
 
         scene = Scene(origin_lat=40.0, origin_lon=-105.0, origin_alt=0.0)

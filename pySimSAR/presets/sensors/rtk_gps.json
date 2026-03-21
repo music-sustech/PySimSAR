@@ -1,6 +1,6 @@
 {
   "type": "gps",
-  "accuracy_rms_m": 0.02,
+  "accuracy_rms_m": 0.002,
   "update_rate_hz": 10.0,
   "outage_intervals": [],
   "error_model": {"type": "gaussian"}

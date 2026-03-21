@@ -6,11 +6,11 @@ import numpy as np
 import pytest
 
 from pySimSAR.tools.view_array import (
-    load_array,
     describe_array,
+    load_array,
+    main,
     parse_slice,
     plot_array,
-    main,
 )
 
 

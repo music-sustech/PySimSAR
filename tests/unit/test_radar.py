@@ -2,18 +2,23 @@
 
 from __future__ import annotations
 
-import math
 import warnings
 
 import numpy as np
 import pytest
 
 from pySimSAR.core.radar import (
-    AntennaPattern, C_LIGHT, K_BOLTZMANN, Radar, create_antenna_from_preset,
+    C_LIGHT,
+    K_BOLTZMANN,
+    AntennaPattern,
+    Radar,
+    create_antenna_from_preset,
 )
 from pySimSAR.core.types import LookSide, PolarizationMode, SARMode
 from pySimSAR.waveforms.base import Waveform
 
+# Expected gain for az=0.05, el=0.03: G = 10*log10(4*pi*0.6 / (0.05*0.03))
+_EXPECTED_GAIN_dB = 10.0 * np.log10(4.0 * np.pi * 0.6 / (0.05 * 0.03))
 
 # ---------------------------------------------------------------------------
 # Mock waveform for Radar tests
@@ -49,7 +54,6 @@ def array_pattern():
         pattern_2d=pattern,
         az_beamwidth=0.05,
         el_beamwidth=0.03,
-        peak_gain_dB=30.0,
         az_angles=az_angles,
         el_angles=el_angles,
     )
@@ -66,7 +70,6 @@ def callable_pattern():
         pattern_2d=_gain,
         az_beamwidth=0.05,
         el_beamwidth=0.03,
-        peak_gain_dB=30.0,
     )
 
 
@@ -102,7 +105,7 @@ class TestAntennaPattern:
         """Array pattern stores fields correctly."""
         assert array_pattern.az_beamwidth == 0.05
         assert array_pattern.el_beamwidth == 0.03
-        assert array_pattern.peak_gain_dB == 30.0
+        assert array_pattern.peak_gain_dB == pytest.approx(_EXPECTED_GAIN_dB)
         assert isinstance(array_pattern.pattern_2d, np.ndarray)
         assert array_pattern.az_angles is not None
         assert array_pattern.el_angles is not None
@@ -111,7 +114,7 @@ class TestAntennaPattern:
         """Callable pattern stores fields correctly."""
         assert callable_pattern.az_beamwidth == 0.05
         assert callable_pattern.el_beamwidth == 0.03
-        assert callable_pattern.peak_gain_dB == 30.0
+        assert callable_pattern.peak_gain_dB == pytest.approx(_EXPECTED_GAIN_dB)
         assert callable(callable_pattern.pattern_2d)
 
     def test_gain_array_interpolation(self, array_pattern):
@@ -141,14 +144,12 @@ class TestAntennaPattern:
                 pattern_2d=lambda az, el: 0.0,
                 az_beamwidth=0.0,
                 el_beamwidth=0.03,
-                peak_gain_dB=30.0,
             )
         with pytest.raises(ValueError, match="az_beamwidth"):
             AntennaPattern(
                 pattern_2d=lambda az, el: 0.0,
                 az_beamwidth=-0.01,
                 el_beamwidth=0.03,
-                peak_gain_dB=30.0,
             )
 
     def test_invalid_el_beamwidth(self):
@@ -158,7 +159,6 @@ class TestAntennaPattern:
                 pattern_2d=lambda az, el: 0.0,
                 az_beamwidth=0.05,
                 el_beamwidth=0.0,
-                peak_gain_dB=30.0,
             )
 
     def test_array_pattern_requires_angles(self):
@@ -169,7 +169,6 @@ class TestAntennaPattern:
                 pattern_2d=pattern,
                 az_beamwidth=0.05,
                 el_beamwidth=0.03,
-                peak_gain_dB=30.0,
             )
 
     def test_array_pattern_shape_mismatch(self):
@@ -182,7 +181,6 @@ class TestAntennaPattern:
                 pattern_2d=pattern,
                 az_beamwidth=0.05,
                 el_beamwidth=0.03,
-                peak_gain_dB=30.0,
                 az_angles=az,
                 el_angles=el,
             )
@@ -495,34 +493,34 @@ class TestAntennaPresets:
         """Flat preset: peak gain at boresight."""
         bw_az = np.radians(3.0)
         bw_el = np.radians(10.0)
-        ant = create_antenna_from_preset("flat", bw_az, bw_el, 30.0)
-        assert ant.gain(0.0, 0.0) == pytest.approx(30.0)
+        ant = create_antenna_from_preset("flat", bw_az, bw_el)
+        assert ant.gain(0.0, 0.0) == pytest.approx(ant.peak_gain_dB)
 
     def test_flat_preset_outside_beam(self):
         """Flat preset: -60 dB floor outside beam."""
         bw_az = np.radians(3.0)
         bw_el = np.radians(10.0)
-        ant = create_antenna_from_preset("flat", bw_az, bw_el, 30.0)
+        ant = create_antenna_from_preset("flat", bw_az, bw_el)
         # Well outside beam
         g = ant.gain(np.radians(10.0), 0.0)
-        assert g == pytest.approx(30.0 - 60.0)
+        assert g == pytest.approx(ant.peak_gain_dB - 60.0)
 
     def test_sinc_preset_boresight(self):
         """Sinc preset: peak gain at boresight."""
         bw_az = np.radians(3.0)
         bw_el = np.radians(10.0)
-        ant = create_antenna_from_preset("sinc", bw_az, bw_el, 30.0)
-        assert ant.gain(0.0, 0.0) == pytest.approx(30.0)
+        ant = create_antenna_from_preset("sinc", bw_az, bw_el)
+        assert ant.gain(0.0, 0.0) == pytest.approx(ant.peak_gain_dB)
 
     def test_sinc_preset_3dB_beamwidth(self):
         """Sinc preset: ~3 dB down at half-beamwidth."""
         bw_az = np.radians(3.0)
         bw_el = np.radians(10.0)
-        ant = create_antenna_from_preset("sinc", bw_az, bw_el, 30.0)
+        ant = create_antenna_from_preset("sinc", bw_az, bw_el)
         # At half-beamwidth in azimuth: sinc(0.886 * 0.5) = sinc(0.443)
         # The 3 dB point for sinc is at ~0.443/0.886 * bw = bw/2
         g = ant.gain(bw_az / 2.0, 0.0)
-        drop = 30.0 - g
+        drop = ant.peak_gain_dB - g
         # Should be approximately 3 dB (sinc(0.443) ≈ 0.707 -> -3.01 dB)
         assert 2.5 < drop < 4.0
 
@@ -530,36 +528,37 @@ class TestAntennaPresets:
         """Gaussian preset: peak gain at boresight."""
         bw_az = np.radians(3.0)
         bw_el = np.radians(10.0)
-        ant = create_antenna_from_preset("gaussian", bw_az, bw_el, 30.0)
-        assert ant.gain(0.0, 0.0) == pytest.approx(30.0)
+        ant = create_antenna_from_preset("gaussian", bw_az, bw_el)
+        assert ant.gain(0.0, 0.0) == pytest.approx(ant.peak_gain_dB)
 
     def test_gaussian_preset_3dB_beamwidth(self):
         """Gaussian preset: exactly 3 dB down at half-beamwidth."""
         bw_az = np.radians(3.0)
         bw_el = np.radians(10.0)
-        ant = create_antenna_from_preset("gaussian", bw_az, bw_el, 30.0)
+        ant = create_antenna_from_preset("gaussian", bw_az, bw_el)
         # K=12: loss = 12 * (0.5)^2 = 3.0 dB exactly
         g = ant.gain(bw_az / 2.0, 0.0)
-        assert g == pytest.approx(27.0)
+        assert g == pytest.approx(ant.peak_gain_dB - 3.0)
 
     def test_gaussian_preset_elevation(self):
         """Gaussian preset: 3 dB down at half-beamwidth in elevation."""
         bw_az = np.radians(3.0)
         bw_el = np.radians(10.0)
-        ant = create_antenna_from_preset("gaussian", bw_az, bw_el, 30.0)
+        ant = create_antenna_from_preset("gaussian", bw_az, bw_el)
         g = ant.gain(0.0, bw_el / 2.0)
-        assert g == pytest.approx(27.0)
+        assert g == pytest.approx(ant.peak_gain_dB - 3.0)
 
     def test_unknown_preset_raises(self):
         """Unknown preset name raises ValueError."""
         with pytest.raises(ValueError, match="Unknown antenna preset"):
-            create_antenna_from_preset("unknown", 0.05, 0.1, 30.0)
+            create_antenna_from_preset("unknown", 0.05, 0.1)
 
     def test_preset_returns_antenna_pattern(self):
         """All presets return AntennaPattern instances."""
+        expected_gain = 10.0 * np.log10(4.0 * np.pi * 0.6 / (0.05 * 0.1))
         for name in ("flat", "sinc", "gaussian"):
-            ant = create_antenna_from_preset(name, 0.05, 0.1, 30.0)
+            ant = create_antenna_from_preset(name, 0.05, 0.1)
             assert isinstance(ant, AntennaPattern)
             assert ant.az_beamwidth == 0.05
             assert ant.el_beamwidth == 0.1
-            assert ant.peak_gain_dB == 30.0
+            assert ant.peak_gain_dB == pytest.approx(expected_gain)

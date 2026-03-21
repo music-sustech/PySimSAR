@@ -1,0 +1,28 @@
+{
+  "velocity_mps": 100.0,
+  "altitude_m": 1000.0,
+  "heading": [
+    0,
+    1,
+    0
+  ],
+  "flight_path_mode": "heading_time",
+  "flight_time": 0.5,
+  "perturbation": {
+    "type": "dryden",
+    "sigma_u": 1.5,
+    "sigma_v": 1.5,
+    "sigma_w": 0.75
+  },
+  "sensors": [
+    {
+      "type": "gps",
+      "accuracy_rms_m": 1.0,
+      "update_rate_hz": 10.0,
+      "outage_intervals": [],
+      "error_model": {
+        "type": "gaussian"
+      }
+    }
+  ]
+}

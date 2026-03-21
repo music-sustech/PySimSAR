@@ -1,0 +1,6 @@
+{
+  "type": "preset",
+  "preset": "sinc",
+  "az_beamwidth_deg": 5.0,
+  "el_beamwidth_deg": 15.0
+}

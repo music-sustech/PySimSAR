@@ -13,7 +13,6 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 from pySimSAR.algorithms.base import ImageTransformationAlgorithm
-from pySimSAR.core.radar import C_LIGHT
 from pySimSAR.core.types import ImageGeometry, SARImage
 
 

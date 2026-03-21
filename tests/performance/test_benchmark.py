@@ -65,7 +65,6 @@ def _create_radar() -> Radar:
         preset="sinc",
         az_beamwidth=np.radians(3.0),
         el_beamwidth=np.radians(5.0),
-        peak_gain_dB=30.0,
     )
     return Radar(
         carrier_freq=9.65e9,  # X-band
@@ -157,7 +156,7 @@ class TestSimulationBenchmark:
         dt_total = t_end - t_start
 
         print(f"\n{'='*60}")
-        print(f"  Performance Benchmark Results")
+        print("  Performance Benchmark Results")
         print(f"  Pulses: {N_PULSES}, Targets: {N_TARGETS}")
         print(f"{'='*60}")
         print(f"  Simulation time : {dt_sim:8.2f} s")

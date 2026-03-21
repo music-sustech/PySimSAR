@@ -7,17 +7,13 @@ expectations.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pytest
 
-from pySimSAR.io.parameter_set import load_parameter_set, build_simulation
-from pySimSAR.simulation.engine import SimulationEngine
-from pySimSAR.core.radar import C_LIGHT
+from pySimSAR.io.parameter_set import build_simulation, load_parameter_set
 from pySimSAR.motion.trajectory import Trajectory as _Trajectory
-
-GOLDEN_DIR = Path(__file__).parent.parent / "golden"
+from pySimSAR.simulation.engine import SimulationEngine
+from tests.conftest import GOLDEN_DIR
 
 GOLDEN_CASES = [
     "single_point_stripmap",
@@ -176,7 +172,6 @@ class TestGoldenSinglePointStripmap:
         raw = _range_compress(sim_result, radar)
 
         from pySimSAR.algorithms.image_formation import image_formation_registry
-        from pySimSAR.motion.trajectory import Trajectory as _Trajectory
         trajectory = _make_trajectory(
             sim_result.pulse_times,
             sim_result.positions,
@@ -226,7 +221,6 @@ class TestGoldenMultiTargetSpotlight:
         radar = sim_objects["radar"]
         raw = _range_compress(sim_result, radar)
 
-        from pySimSAR.motion.trajectory import Trajectory as _Trajectory
         trajectory = _make_trajectory(
             sim_result.pulse_times,
             sim_result.positions,

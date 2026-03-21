@@ -1,12 +1,24 @@
 """Two-tier preset browser dialog (system read-only + user read-write)."""
 from __future__ import annotations
+
 from pathlib import Path
-from PyQt6.QtCore import pyqtSignal, Qt
+
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QDialog, QHBoxLayout, QInputDialog, QLabel, QListWidget,
-    QListWidgetItem, QMessageBox, QPushButton, QSplitter,
-    QTextEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QDialog,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QTextEdit,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
 )
+
 from pySimSAR.io.user_data import UserDataDir
 
 _CATEGORIES = ["antennas", "waveforms", "platforms", "sensors", "full-scenario"]

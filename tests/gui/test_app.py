@@ -6,13 +6,11 @@ all panels display correct data.
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 
 pytest.importorskip("PyQt6")
 
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
 

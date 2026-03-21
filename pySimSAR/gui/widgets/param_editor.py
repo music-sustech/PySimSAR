@@ -28,7 +28,6 @@ from PyQt6.QtWidgets import (
 
 from pySimSAR.core.types import LookSide, PolarizationMode, RampType, SARMode
 
-
 # ---------------------------------------------------------------------------
 # Reusable UnitSpinBox
 # ---------------------------------------------------------------------------
@@ -151,7 +150,12 @@ class _CleanDoubleSpinBox(QDoubleSpinBox):
         return text
 
     def valueFromText(self, text: str) -> float:  # noqa: N802
-        return float(text.strip())
+        clean = text
+        if self.suffix():
+            clean = clean.removesuffix(self.suffix())
+        if self.prefix():
+            clean = clean.removeprefix(self.prefix())
+        return float(clean.strip())
 
     def validate(self, text: str, pos: int):
         from PyQt6.QtGui import QValidator
@@ -253,17 +257,15 @@ class AntennaParamEditor(QGroupBox):
         self._preset = _combo(["flat", "sinc", "gaussian"], "flat")
         self._az_beamwidth = _plain_spin(10.0, 0.01, 180.0, 0.5, "\u00b0")
         self._el_beamwidth = _plain_spin(10.0, 0.01, 180.0, 0.5, "\u00b0")
-        self._peak_gain_dB = _plain_spin(30.0, -30.0, 80.0, 1.0, " dB")
 
         form.addRow("Preset:", self._preset)
         form.addRow("Az Beamwidth:", self._az_beamwidth)
         form.addRow("El Beamwidth:", self._el_beamwidth)
-        form.addRow("Peak Gain:", self._peak_gain_dB)
 
         self._preset.currentTextChanged.connect(
             lambda _: self.params_changed.emit()
         )
-        for w in (self._az_beamwidth, self._el_beamwidth, self._peak_gain_dB):
+        for w in (self._az_beamwidth, self._el_beamwidth):
             w.valueChanged.connect(self.params_changed)
 
     def get_params(self) -> dict:
@@ -271,7 +273,6 @@ class AntennaParamEditor(QGroupBox):
             "preset": self._preset.currentText(),
             "az_beamwidth": math.radians(self._az_beamwidth.value()),
             "el_beamwidth": math.radians(self._el_beamwidth.value()),
-            "peak_gain_dB": self._peak_gain_dB.value(),
         }
 
     def set_params(self, params: dict) -> None:
@@ -281,8 +282,6 @@ class AntennaParamEditor(QGroupBox):
             self._az_beamwidth.setValue(math.degrees(params["az_beamwidth"]))
         if "el_beamwidth" in params:
             self._el_beamwidth.setValue(math.degrees(params["el_beamwidth"]))
-        if "peak_gain_dB" in params:
-            self._peak_gain_dB.setValue(params["peak_gain_dB"])
 
 
 # ---------------------------------------------------------------------------
@@ -306,13 +305,13 @@ class RadarParamEditor(QGroupBox):
             _FREQ, "Hz", value=1000.0, minimum=1.0, maximum=999999.0, step=100.0,
         )
         self._transmit_power = UnitSpinBox(
-            _POWER, "W", value=1000.0, minimum=0.01, maximum=999999.0, step=100.0,
+            _POWER, "W", value=1.0, minimum=0.01, maximum=999999.0, step=0.1,
         )
         self._receiver_gain = _plain_spin(30.0, 0.0, 120.0, 1.0, " dB")
         self._system_losses = _plain_spin(2.0, 0.0, 60.0, 0.5, " dB")
         self._noise_figure = _plain_spin(3.0, 0.0, 30.0, 0.5, " dB")
-        self._squint_angle = _plain_spin(0.0, -90.0, 90.0, 1.0, "\u00b0")
         self._reference_temp = _plain_spin(290.0, 1.0, 10000.0, 10.0, " K")
+        self._squint_angle = _plain_spin(0.0, -90.0, 90.0, 1.0, "\u00b0")
         self._polarization = _combo(
             [m.value for m in PolarizationMode], PolarizationMode.SINGLE.value,
         )
@@ -330,19 +329,19 @@ class RadarParamEditor(QGroupBox):
         form.addRow("Receiver Gain:", self._receiver_gain)
         form.addRow("System Losses:", self._system_losses)
         form.addRow("Noise Figure:", self._noise_figure)
-        form.addRow("Squint Angle:", self._squint_angle)
         form.addRow("Reference Temp:", self._reference_temp)
         form.addRow("Polarization:", self._polarization)
         form.addRow("SAR Mode:", self._mode)
         form.addRow("Look Side:", self._look_side)
         form.addRow("Depression Angle:", self._depression_angle)
+        form.addRow("Squint Angle:", self._squint_angle)
 
         # Connect signals
         for w in (self._carrier_freq, self._prf, self._transmit_power):
             w.value_changed.connect(self.params_changed)
         for w in (self._receiver_gain, self._system_losses, self._noise_figure,
-                  self._squint_angle, self._reference_temp,
-                  self._depression_angle):
+                  self._reference_temp, self._depression_angle,
+                  self._squint_angle):
             w.valueChanged.connect(self.params_changed)
         for w in (self._polarization, self._mode, self._look_side):
             w.currentTextChanged.connect(lambda _: self.params_changed.emit())
@@ -355,12 +354,12 @@ class RadarParamEditor(QGroupBox):
             "receiver_gain_dB": self._receiver_gain.value(),
             "system_losses": self._system_losses.value(),
             "noise_figure": self._noise_figure.value(),
-            "squint_angle": math.radians(self._squint_angle.value()),
             "reference_temp": self._reference_temp.value(),
             "polarization": self._polarization.currentText(),
             "mode": self._mode.currentText(),
             "look_side": self._look_side.currentText(),
             "depression_angle": math.radians(self._depression_angle.value()),
+            "squint_angle": math.radians(self._squint_angle.value()),
         }
 
     def set_params(self, params: dict) -> None:
@@ -376,8 +375,6 @@ class RadarParamEditor(QGroupBox):
             self._system_losses.setValue(params["system_losses"])
         if "noise_figure" in params:
             self._noise_figure.setValue(params["noise_figure"])
-        if "squint_angle" in params:
-            self._squint_angle.setValue(math.degrees(params["squint_angle"]))
         if "reference_temp" in params:
             self._reference_temp.setValue(params["reference_temp"])
         if "polarization" in params:
@@ -388,6 +385,8 @@ class RadarParamEditor(QGroupBox):
             self._look_side.setCurrentText(str(params["look_side"]))
         if "depression_angle" in params:
             self._depression_angle.setValue(math.degrees(params["depression_angle"]))
+        if "squint_angle" in params:
+            self._squint_angle.setValue(math.degrees(params["squint_angle"]))
 
 
 # ---------------------------------------------------------------------------
@@ -418,6 +417,7 @@ class WaveformParamEditor(QGroupBox):
         self._window = _combo(
             ["(None)", "hamming", "hanning", "blackman", "kaiser"], "(None)",
         )
+        self._kaiser_beta = _plain_spin(6.0, 0.0, 40.0, 0.5, "")
 
         form.addRow("Waveform Type:", self._waveform_type)
         form.addRow("Bandwidth:", self._bandwidth)
@@ -425,6 +425,7 @@ class WaveformParamEditor(QGroupBox):
         form.addRow("FMCW Duty Cycle:", self._fmcw_duty_cycle)
         form.addRow("Ramp Type:", self._ramp_type)
         form.addRow("Window:", self._window)
+        form.addRow("Kaiser \u03b2:", self._kaiser_beta)
 
         # Phase noise section
         self._phase_noise_enabled = QCheckBox("Enable Phase Noise")
@@ -449,9 +450,11 @@ class WaveformParamEditor(QGroupBox):
         self._phase_noise_enabled.toggled.connect(self._on_phase_noise_toggled)
         self._on_phase_noise_toggled(False)
 
-        # Show/hide fields based on waveform type
+        # Show/hide fields based on waveform type and window selection
         self._waveform_type.currentTextChanged.connect(self._on_type_changed)
         self._on_type_changed(self._waveform_type.currentText())
+        self._window.currentTextChanged.connect(self._on_window_changed)
+        self._on_window_changed(self._window.currentText())
 
         # Connect change signals
         self._bandwidth.value_changed.connect(self.params_changed)
@@ -463,6 +466,7 @@ class WaveformParamEditor(QGroupBox):
         self._window.currentTextChanged.connect(
             lambda _: self.params_changed.emit()
         )
+        self._kaiser_beta.valueChanged.connect(self.params_changed)
         self._waveform_type.currentTextChanged.connect(
             lambda _: self.params_changed.emit()
         )
@@ -499,6 +503,15 @@ class WaveformParamEditor(QGroupBox):
                 label_ramp.setVisible(not is_lfm)
         self._ramp_type.setVisible(not is_lfm)
 
+    def _on_window_changed(self, text: str) -> None:
+        is_kaiser = text == "kaiser"
+        self._kaiser_beta.setVisible(is_kaiser)
+        form = self.findChild(QFormLayout)
+        if form is not None:
+            label = form.labelForField(self._kaiser_beta)
+            if label is not None:
+                label.setVisible(is_kaiser)
+
     def get_params(self) -> dict:
         wtype = self._waveform_type.currentText()
         window_text = self._window.currentText()
@@ -507,6 +520,8 @@ class WaveformParamEditor(QGroupBox):
             "bandwidth": self._bandwidth.si_value(),
             "window": None if window_text == "(None)" else window_text,
         }
+        if window_text == "kaiser":
+            params["kaiser_beta"] = self._kaiser_beta.value()
         if wtype == "LFM":
             params["duty_cycle"] = self._duty_cycle.value()
         elif wtype == "FMCW":
@@ -539,16 +554,17 @@ class WaveformParamEditor(QGroupBox):
         if "window" in params:
             w = params["window"]
             self._window.setCurrentText("(None)" if w is None else str(w))
+        if "kaiser_beta" in params:
+            self._kaiser_beta.setValue(params["kaiser_beta"])
         if "phase_noise" in params:
             pn = params["phase_noise"]
+            enabled = params.get("phase_noise_enabled", pn is not None)
+            self._phase_noise_enabled.setChecked(enabled)
             if pn is not None:
-                self._phase_noise_enabled.setChecked(True)
                 self._flicker_fm.setValue(pn.get("flicker_fm_level", -80.0))
                 self._white_fm.setValue(pn.get("white_fm_level", -100.0))
                 self._flicker_pm.setValue(pn.get("flicker_pm_level", -120.0))
                 self._white_floor.setValue(pn.get("white_floor", -150.0))
-            else:
-                self._phase_noise_enabled.setChecked(False)
 
 
 # ---------------------------------------------------------------------------
@@ -605,7 +621,7 @@ class PlatformParamEditor(QGroupBox):
         # GPS Sensor
         self._gps_enabled = QCheckBox("GPS Sensor")
         form.addRow(self._gps_enabled)
-        self._gps_accuracy = _plain_spin(0.02, 0.0, 100.0, 0.01, " m")
+        self._gps_accuracy = _plain_spin(0.002, 0.0, 100.0, 0.001, " m")
         self._gps_rate = _plain_spin(10.0, 0.1, 1000.0, 1.0, " Hz")
         form.addRow("GPS Accuracy:", self._gps_accuracy)
         form.addRow("GPS Rate:", self._gps_rate)
@@ -616,8 +632,8 @@ class PlatformParamEditor(QGroupBox):
         # IMU Sensor
         self._imu_enabled = QCheckBox("IMU Sensor")
         form.addRow(self._imu_enabled)
-        self._accel_noise = _plain_spin(0.0002, 0.0, 10.0, 0.0001, " m/s\u00b2/\u221aHz")
-        self._gyro_noise = _plain_spin(0.000005, 0.0, 1.0, 0.000001, " rad/s/\u221aHz")
+        self._accel_noise = _plain_spin(0.0001, 0.0, 10.0, 0.0001, " m/s\u00b2/\u221aHz")
+        self._gyro_noise = _plain_spin(0.00001, 0.0, 1.0, 0.000001, " rad/s/\u221aHz")
         self._imu_rate = _plain_spin(200.0, 1.0, 10000.0, 10.0, " Hz")
         form.addRow("Accel Noise:", self._accel_noise)
         form.addRow("Gyro Noise:", self._gyro_noise)
@@ -715,30 +731,27 @@ class PlatformParamEditor(QGroupBox):
                 self._start_z.set_si_value(pos[2])
         if "perturbation" in params:
             p = params["perturbation"]
+            enabled = params.get("perturbation_enabled", p is not None)
+            self._perturbation_enabled.setChecked(enabled)
             if p is not None:
-                self._perturbation_enabled.setChecked(True)
                 self._sigma_u.setValue(p.get("sigma_u", 1.0))
                 self._sigma_v.setValue(p.get("sigma_v", 1.0))
                 self._sigma_w.setValue(p.get("sigma_w", 0.5))
-            else:
-                self._perturbation_enabled.setChecked(False)
         if "gps" in params:
             g = params["gps"]
+            enabled = params.get("gps_enabled", g is not None)
+            self._gps_enabled.setChecked(enabled)
             if g is not None:
-                self._gps_enabled.setChecked(True)
-                self._gps_accuracy.setValue(g.get("accuracy", 0.02))
+                self._gps_accuracy.setValue(g.get("accuracy", 0.002))
                 self._gps_rate.setValue(g.get("rate", 10.0))
-            else:
-                self._gps_enabled.setChecked(False)
         if "imu" in params:
-            i = params["imu"]
-            if i is not None:
-                self._imu_enabled.setChecked(True)
-                self._accel_noise.setValue(i.get("accel_noise", 0.0002))
-                self._gyro_noise.setValue(i.get("gyro_noise", 0.000005))
-                self._imu_rate.setValue(i.get("rate", 200.0))
-            else:
-                self._imu_enabled.setChecked(False)
+            im = params["imu"]
+            enabled = params.get("imu_enabled", im is not None)
+            self._imu_enabled.setChecked(enabled)
+            if im is not None:
+                self._accel_noise.setValue(im.get("accel_noise", 0.0001))
+                self._gyro_noise.setValue(im.get("gyro_noise", 0.00001))
+                self._imu_rate.setValue(im.get("rate", 200.0))
 
 
 # ---------------------------------------------------------------------------
@@ -788,12 +801,15 @@ class SceneParamEditor(QGroupBox):
         btn_row = QHBoxLayout()
         self._btn_add = QPushButton("Add Target")
         self._btn_remove = QPushButton("Remove Selected")
+        self._btn_delete_all = QPushButton("Delete All")
         btn_row.addWidget(self._btn_add)
         btn_row.addWidget(self._btn_remove)
+        btn_row.addWidget(self._btn_delete_all)
         layout.addLayout(btn_row)
 
         self._btn_add.clicked.connect(self._add_target)
         self._btn_remove.clicked.connect(self._remove_selected)
+        self._btn_delete_all.clicked.connect(self._delete_all_targets)
 
         layout.addWidget(
             QLabel("(Distributed targets: use Python API)")
@@ -803,36 +819,6 @@ class SceneParamEditor(QGroupBox):
         delegate = self._target_table.itemDelegate()
         if delegate is not None:
             delegate.closeEditor.connect(self._on_editor_closed)
-
-        # Add default targets — "MUSIC" in 5×7 pixel font on a 4m grid
-        # Letters left-to-right along x (range), upright with height in y.
-        # Centered at x=1000, y=0.
-        _letters = {
-            "M": [(0,0),(4,0),(0,1),(1,1),(3,1),(4,1),(0,2),(2,2),(4,2),
-                  (0,3),(4,3),(0,4),(4,4),(0,5),(4,5),(0,6),(4,6)],
-            "U": [(0,0),(4,0),(0,1),(4,1),(0,2),(4,2),(0,3),(4,3),
-                  (0,4),(4,4),(0,5),(4,5),(1,6),(2,6),(3,6)],
-            "S": [(1,0),(2,0),(3,0),(0,1),(4,1),(0,2),
-                  (1,3),(2,3),(3,3),(4,4),(0,5),(4,5),(1,6),(2,6),(3,6)],
-            "I": [(0,0),(1,0),(2,0),(3,0),(4,0),(2,1),(2,2),(2,3),
-                  (2,4),(2,5),(0,6),(1,6),(2,6),(3,6),(4,6)],
-            "C": [(1,0),(2,0),(3,0),(0,1),(4,1),(0,2),(0,3),
-                  (0,4),(0,5),(4,5),(1,6),(2,6),(3,6)],
-        }
-        _word = "MUSIC"
-        _grid = 4.0  # meters per grid cell
-        _cx, _cy = 1000.0, 0.0  # center
-        # Letters side-by-side along x: each 5 cols wide, 2-col gap between
-        _total_cols = len(_word) * 5 + (len(_word) - 1) * 2  # 33
-        _col_center_total = (_total_cols - 1) / 2.0
-        _row_center = 3.0  # (7 - 1) / 2
-        for li, ch in enumerate(_word):
-            col_start = li * 7  # 5 cols + 2 gap
-            for c, r in _letters[ch]:
-                # col → x (range, left-to-right), row → y (azimuth, top-down)
-                x = _cx + ((col_start + c) - _col_center_total) * _grid
-                y = _cy + (r - _row_center) * _grid
-                self._add_target_at(x, y, 0)
 
     def _on_editor_closed(self) -> None:
         self._target_table.clearSelection()
@@ -864,6 +850,10 @@ class SceneParamEditor(QGroupBox):
         )
         for r in rows:
             self._target_table.removeRow(r)
+        self.params_changed.emit()
+
+    def _delete_all_targets(self) -> None:
+        self._target_table.setRowCount(0)
         self.params_changed.emit()
 
     def _read_targets(self) -> list[dict]:

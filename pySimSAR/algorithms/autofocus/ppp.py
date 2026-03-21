@@ -16,7 +16,7 @@ from __future__ import annotations
 import numpy as np
 
 from pySimSAR.algorithms.base import AutofocusAlgorithm
-from pySimSAR.core.types import PhaseHistoryData, SARImage
+from pySimSAR.core.types import PhaseHistoryData
 
 
 class ProminentPointProcessing(AutofocusAlgorithm):
@@ -77,6 +77,7 @@ class ProminentPointProcessing(AutofocusAlgorithm):
             carrier_freq=phase_history.carrier_freq,
             bandwidth=phase_history.bandwidth,
             channel=phase_history.channel,
+            gate_delay=getattr(phase_history, "gate_delay", 0.0),
         )
 
         for _ in range(self.max_iterations):

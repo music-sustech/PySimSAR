@@ -12,12 +12,14 @@ ALGORITHM_SCHEMAS: dict[str, dict[str, list[dict]]] = {
         "range_doppler": [
             {
                 "name": "apply_rcmc",
+                "label": "Apply RCMC",
                 "type": "bool",
                 "default": True,
                 "description": "Apply range cell migration correction",
             },
             {
                 "name": "rcmc_interp_order",
+                "label": "RCMC Interp. Order",
                 "type": "int",
                 "default": 8,
                 "min": 2,
@@ -47,16 +49,7 @@ ALGORITHM_SCHEMAS: dict[str, dict[str, list[dict]]] = {
     },
     "moco": {
         "first_order": [],
-        "second_order": [
-            {
-                "name": "block_size",
-                "type": "int",
-                "default": 64,
-                "min": 8,
-                "max": 512,
-                "description": "Block size for range-dependent MoCo",
-            },
-        ],
+        "second_order": [],
     },
     "autofocus": {
         "pga": [

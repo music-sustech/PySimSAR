@@ -12,12 +12,9 @@ Tests verify:
 from __future__ import annotations
 
 import numpy as np
-import pytest
-
-from functools import partial
 
 from pySimSAR.algorithms.base import AutofocusAlgorithm, MotionCompensationAlgorithm
-from pySimSAR.core.radar import AntennaPattern, C_LIGHT, Radar
+from pySimSAR.core.radar import C_LIGHT, AntennaPattern, Radar
 from pySimSAR.core.scene import PointTarget, Scene
 from pySimSAR.core.types import PhaseHistoryData, RawData, SARImage
 from pySimSAR.motion.trajectory import Trajectory
@@ -28,16 +25,15 @@ from pySimSAR.simulation.engine import SimulationEngine
 SCENE_CENTER = np.array([5000.0, 0.0, 0.0])
 
 
-def _make_isotropic_antenna(peak_gain_dB: float = 30.0) -> AntennaPattern:
+def _make_isotropic_antenna() -> AntennaPattern:
     """Create an isotropic antenna for test."""
     az = np.linspace(-np.pi, np.pi, 5)
     el = np.linspace(-np.pi / 2, np.pi / 2, 5)
-    pattern = np.full((len(el), len(az)), peak_gain_dB)
+    pattern = np.full((len(el), len(az)), 30.0)
     return AntennaPattern(
         pattern_2d=pattern,
         az_beamwidth=np.radians(10),
         el_beamwidth=np.radians(10),
-        peak_gain_dB=peak_gain_dB,
         az_angles=az,
         el_angles=el,
     )

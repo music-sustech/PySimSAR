@@ -1,0 +1,8 @@
+{
+  "image_formation": {
+    "algorithm": "chirp_scaling",
+    "params": {}
+  },
+  "moco": null,
+  "autofocus": null
+}

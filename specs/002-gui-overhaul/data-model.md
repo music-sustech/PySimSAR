@@ -20,7 +20,6 @@ Represents a single node in the parameter tree hierarchy.
 - `min_value`, `max_value` (optional) — Valid range constraints
 - `enum_choices` (list[str], optional) — For ENUM type
 - `tooltip` (str) — Description for hover tooltip
-- `icon` (str, optional) — Icon resource path (for top-level categories)
 - `enabled` (bool) — Whether editable (false when mode-irrelevant)
 - `disabled_reason` (str, optional) — Tooltip explaining why disabled
 - `children` (list[ParameterNode]) — Child nodes in hierarchy

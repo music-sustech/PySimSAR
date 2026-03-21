@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 
 from pySimSAR.core.platform import Platform
-from pySimSAR.core.scene import Scene
 from pySimSAR.core.radar import Radar
+from pySimSAR.core.scene import Scene
 from pySimSAR.core.types import SimulationState
 
 # Valid state transitions: maps current state -> set of reachable states

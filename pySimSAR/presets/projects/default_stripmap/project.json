@@ -1,7 +1,7 @@
 {
   "format_version": "1.0",
-  "name": "Default Stripmap \u2014 MUSIC Targets",
-  "description": "75 point targets spelling MUSIC on a 4m grid. X-band airborne stripmap.",
+  "name": "Default Stripmap \u2014 SUSTech Targets",
+  "description": "93 point targets spelling SUSTech on a 4m grid. X-band airborne stripmap.",
   "scene": {
     "$ref": "scene.json"
   },
@@ -17,7 +17,7 @@
   "simulation": {
     "seed": 42,
     "swath_range_m": [
-      1350.0,
+      1330.0,
       1500.0
     ],
     "sample_rate_hz": null

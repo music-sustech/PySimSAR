@@ -8,9 +8,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pySimSAR.core.scene import DistributedTarget, PointTarget, Scene
 from pySimSAR.clutter.uniform import UniformClutter
-
+from pySimSAR.core.scene import DistributedTarget, PointTarget, Scene
 
 # ---------------------------------------------------------------------------
 # PointTarget tests

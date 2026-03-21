@@ -1,9 +1,11 @@
 """Polarimetric decomposition visualization panel."""
 from __future__ import annotations
+
 import numpy as np
-from PyQt6.QtWidgets import QVBoxLayout, QWidget, QHBoxLayout, QLabel, QComboBox
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+
 
 class PolarimetryPanel(QWidget):
     def __init__(self, parent=None):
@@ -22,7 +24,10 @@ class PolarimetryPanel(QWidget):
         self._fig = Figure(figsize=(5, 4), tight_layout=True)
         self._canvas = FigureCanvasQTAgg(self._fig)
         self._ax = self._fig.add_subplot(111)
-        self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+        self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
         layout.addWidget(self._canvas)
 
         self._decomposition = None
@@ -41,7 +46,10 @@ class PolarimetryPanel(QWidget):
     def _refresh(self):
         self._ax.clear()
         if self._decomposition is None:
-            self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+            self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
             self._canvas.draw_idle()
             return
 
@@ -73,5 +81,8 @@ class PolarimetryPanel(QWidget):
     def clear(self):
         self._decomposition = None
         self._ax.clear()
-        self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+        self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
         self._canvas.draw_idle()

@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from pySimSAR.core.types import RawData, SARImage
-from pySimSAR.io.hdf5_format import write_hdf5, read_hdf5
+from pySimSAR.io.hdf5_format import read_hdf5, write_hdf5
 from pySimSAR.motion.trajectory import Trajectory
 from pySimSAR.sensors.nav_data import NavigationData
 

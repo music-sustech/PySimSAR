@@ -9,10 +9,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pySimSAR.waveforms.lfm import LFMWaveform
 from pySimSAR.waveforms.fmcw import FMCWWaveform
+from pySimSAR.waveforms.lfm import LFMWaveform
 from pySimSAR.waveforms.phase_noise import CompositePSDPhaseNoise
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures

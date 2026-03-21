@@ -1,19 +1,21 @@
 """First-Order Motion Compensation (MoCo) for SAR.
 
 Applies a bulk (range-independent) phase correction for each pulse based on
-the slant-range deviation between the measured platform position and
-the reference (ideal) trajectory, computed to a scene center reference point.
+the slant-range deviation between the measured platform position and a
+reference straight-line track fitted from the navigation data.
 
 Algorithm:
-    For each pulse n:
-        1. dR(n) = |scene_center - nav_pos(n)| - |scene_center - ref_pos(n)|
-        2. Phase correction: exp(+j * 4*pi/lambda * dR(n))
+    1. Fit a straight-line reference track through GPS positions (least-squares).
+    2. For each pulse n:
+        dR(n) = |scene_center - nav_pos(n)| - |scene_center - ref_pos(n)|
+        Phase correction: exp(+j * 4*pi/lambda * dR(n))
 """
 
 from __future__ import annotations
 
 import numpy as np
 from scipy.interpolate import interp1d
+from scipy.signal import savgol_filter
 
 from pySimSAR.algorithms.base import MotionCompensationAlgorithm
 from pySimSAR.core.radar import C_LIGHT
@@ -29,12 +31,16 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
     error by computing the slant-range deviation to a reference point
     for each pulse and applying a uniform phase shift across all range bins.
 
+    The reference track is a straight-line least-squares fit through the
+    GPS-measured positions — no knowledge of the "ideal" trajectory is
+    required.
+
     Parameters
     ----------
     scene_center : np.ndarray | None
         Reference ground point for range error computation, shape (3,).
-        If None, estimated from the reference trajectory geometry as
-        the broadside ground point at the mid-aperture position.
+        If None, estimated from the fitted reference trajectory geometry
+        as the broadside ground point at mid-aperture.
     """
 
     name = "first_order"
@@ -54,7 +60,7 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
         self,
         raw_data: RawData,
         nav_data: NavigationData,
-        reference_track: Trajectory,
+        reference_track: Trajectory | None = None,
     ) -> RawData:
         """Apply first-order motion compensation.
 
@@ -65,8 +71,9 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
             Echo shape: (n_azimuth, n_range).
         nav_data : NavigationData
             Navigation sensor measurements with measured positions.
-        reference_track : Trajectory
-            Reference (ideal) trajectory.
+        reference_track : Trajectory | None
+            Explicit reference trajectory. If None (the normal case),
+            a straight-line track is fitted from the GPS positions.
 
         Returns
         -------
@@ -78,19 +85,25 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
 
         wavelength = C_LIGHT / raw_data.carrier_freq
 
-        # Get positions aligned to pulse times
-        ref_pos, nav_pos = self._align_positions(
-            n_az, raw_data.prf, nav_data, reference_track
-        )
+        # Get measured positions aligned to pulse times
+        nav_pos = self._align_nav_positions(n_az, raw_data.prf, nav_data)
 
-        # Get reference velocities
-        if len(reference_track) == n_az:
-            ref_vel = reference_track.velocity
+        # Smooth GPS positions to remove measurement noise while
+        # preserving the low-frequency motion errors we want to correct.
+        smoothed_pos = self._smooth_positions(nav_pos)
+
+        # Determine reference positions
+        if reference_track is not None:
+            ref_pos = self._align_ref_positions(
+                n_az, raw_data.prf, reference_track
+            )
         else:
-            pulse_times = np.arange(n_az) / raw_data.prf
-            ref_vel = np.column_stack(
-                [reference_track.interpolate_velocity(t) for t in pulse_times]
-            ).T
+            # Fit a straight-line reference from GPS data
+            ref_pos = self._fit_straight_line(smoothed_pos)
+
+        # Reference velocities (numerical differentiation of ref_pos)
+        dt = 1.0 / raw_data.prf
+        ref_vel = np.gradient(ref_pos, dt, axis=0)
 
         # Determine scene center
         if self._scene_center is not None:
@@ -98,13 +111,10 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
         else:
             scene_center = self._estimate_scene_center(ref_pos, ref_vel)
 
-        # Compute range errors for each pulse
-        delta_r = self._compute_range_errors(ref_pos, nav_pos, scene_center)
+        # Compute range errors using smoothed positions (not raw GPS)
+        delta_r = self._compute_range_errors(ref_pos, smoothed_pos, scene_center)
 
         # Apply phase correction: exp(+j * 4*pi/lambda * dR)
-        # The echo phase is -4*pi/lambda * R (see compute_echo_phase).
-        # When R increases by dR, the phase decreases by 4*pi/lambda * dR.
-        # To compensate, we add +4*pi/lambda * dR.
         phase_correction = np.exp(1j * 4.0 * np.pi / wavelength * delta_r)
 
         # Apply the same correction to all range bins in each pulse
@@ -122,46 +132,112 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
             gate_delay=raw_data.gate_delay,
         )
 
-    def _align_positions(
-        self,
+    # ------------------------------------------------------------------
+    # Position alignment
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _align_nav_positions(
         n_az: int,
         prf: float,
         nav_data: NavigationData,
+    ) -> np.ndarray:
+        """Interpolate GPS positions to pulse times, shape (n_az, 3)."""
+        if nav_data.position is None:
+            raise ValueError("NavigationData must contain position measurements")
+        pulse_times = np.arange(n_az) / prf
+        if len(nav_data.time) == n_az:
+            return nav_data.position.copy()
+        interp = interp1d(
+            nav_data.time,
+            nav_data.position,
+            axis=0,
+            kind="linear",
+            fill_value="extrapolate",
+        )
+        return interp(pulse_times)
+
+    @staticmethod
+    def _align_ref_positions(
+        n_az: int,
+        prf: float,
         reference_track: Trajectory,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Get reference and measured positions aligned to pulse times.
+    ) -> np.ndarray:
+        """Get reference trajectory positions at pulse times, shape (n_az, 3)."""
+        if len(reference_track) == n_az:
+            return reference_track.position.copy()
+        pulse_times = np.arange(n_az) / prf
+        return np.column_stack(
+            [reference_track.interpolate_position(t) for t in pulse_times]
+        ).T
+
+    # ------------------------------------------------------------------
+    # GPS smoothing
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _smooth_positions(positions: np.ndarray) -> np.ndarray:
+        """Smooth GPS positions with a Savitzky-Golay filter.
+
+        Removes high-frequency measurement noise while preserving the
+        low-frequency platform motion that MoCo needs to correct.
+
+        Parameters
+        ----------
+        positions : np.ndarray
+            Raw GPS positions, shape (N, 3).
 
         Returns
         -------
-        tuple of (ref_positions, nav_positions)
-            Both shape (n_az, 3).
+        np.ndarray
+            Smoothed positions, shape (N, 3).
         """
-        pulse_times = np.arange(n_az) / prf
-
-        # Reference positions
-        if len(reference_track) == n_az:
-            ref_pos = reference_track.position
-        else:
-            ref_pos = np.column_stack(
-                [reference_track.interpolate_position(t) for t in pulse_times]
-            ).T
-
-        # Measured positions from nav data
-        if nav_data.position is not None and len(nav_data.time) == n_az:
-            nav_pos = nav_data.position
-        elif nav_data.position is not None:
-            interp = interp1d(
-                nav_data.time,
-                nav_data.position,
-                axis=0,
-                kind="linear",
-                fill_value="extrapolate",
+        n = len(positions)
+        # Window must be odd and <= n; use ~5% of aperture, min 5
+        window = max(5, n // 20) | 1  # ensure odd
+        window = min(window, n if n % 2 == 1 else n - 1)
+        if window < 5:
+            return positions.copy()
+        poly_order = min(3, window - 1)
+        smoothed = np.empty_like(positions)
+        for axis in range(3):
+            smoothed[:, axis] = savgol_filter(
+                positions[:, axis], window, poly_order
             )
-            nav_pos = interp(pulse_times)
-        else:
-            raise ValueError("NavigationData must contain position measurements")
+        return smoothed
 
-        return ref_pos, nav_pos
+    # ------------------------------------------------------------------
+    # Straight-line reference fit
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _fit_straight_line(positions: np.ndarray) -> np.ndarray:
+        """Fit a straight-line trajectory through measured positions.
+
+        Performs a least-squares linear fit: pos(n) = p0 + v * t(n),
+        independently for each axis.
+
+        Parameters
+        ----------
+        positions : np.ndarray
+            Measured positions, shape (N, 3).
+
+        Returns
+        -------
+        np.ndarray
+            Fitted straight-line positions, shape (N, 3).
+        """
+        n = len(positions)
+        t = np.arange(n, dtype=float)
+        # Design matrix: [1, t]
+        A = np.column_stack([np.ones(n), t])
+        # Solve for each axis: coeffs shape (2, 3)
+        coeffs, _, _, _ = np.linalg.lstsq(A, positions, rcond=None)
+        return A @ coeffs
+
+    # ------------------------------------------------------------------
+    # Scene center estimation
+    # ------------------------------------------------------------------
 
     @staticmethod
     def _estimate_scene_center(
@@ -210,6 +286,10 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
         sc += cross * ground_range
         sc[2] = 0.0
         return sc
+
+    # ------------------------------------------------------------------
+    # Range error computation
+    # ------------------------------------------------------------------
 
     @staticmethod
     def _compute_range_errors(

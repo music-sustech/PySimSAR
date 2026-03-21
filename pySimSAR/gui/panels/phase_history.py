@@ -1,9 +1,11 @@
 """Phase history (range-compressed waterfall) visualization panel."""
 from __future__ import annotations
+
 import numpy as np
-from PyQt6.QtWidgets import QVBoxLayout, QWidget, QComboBox, QHBoxLayout, QLabel
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+
 
 class PhaseHistoryPanel(QWidget):
     def __init__(self, parent=None):
@@ -29,7 +31,10 @@ class PhaseHistoryPanel(QWidget):
         self._canvas = FigureCanvasQTAgg(self._fig)
         self._ax = self._fig.add_subplot(111)
         self._ax.set_title("Phase History")
-        self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+        self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
         layout.addWidget(self._canvas)
 
         self._dr_combo.currentTextChanged.connect(self._refresh)
@@ -44,7 +49,10 @@ class PhaseHistoryPanel(QWidget):
     def _refresh(self):
         self._ax.clear()
         if self._data is None:
-            self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+            self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
             self._canvas.draw_idle()
             return
         data = np.abs(self._data.data)
@@ -61,5 +69,8 @@ class PhaseHistoryPanel(QWidget):
     def clear(self):
         self._data = None
         self._ax.clear()
-        self._ax.text(0.5, 0.5, "No data", transform=self._ax.transAxes, ha='center', va='center', fontsize=14, color='gray')
+        self._ax.text(
+            0.5, 0.5, "No data", transform=self._ax.transAxes,
+            ha='center', va='center', fontsize=14, color='gray',
+        )
         self._canvas.draw_idle()

@@ -71,7 +71,7 @@ class UserDataDir:
         }
         if self.preferences_path.exists():
             try:
-                with open(self.preferences_path, "r", encoding="utf-8") as f:
+                with open(self.preferences_path, encoding="utf-8") as f:
                     stored = json.load(f)
                 defaults.update(stored)
             except (json.JSONDecodeError, OSError):
@@ -118,7 +118,7 @@ class UserDataDir:
 
     def load_preset(self, path: Path) -> dict:
         """Load a preset from a JSON file."""
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
 
     def save_user_preset(self, category: str, name: str, params: dict) -> Path:

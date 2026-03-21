@@ -1,0 +1,6 @@
+{
+  "type": "dryden",
+  "sigma_u": 1.0,
+  "sigma_v": 1.0,
+  "sigma_w": 0.5
+}
