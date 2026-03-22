@@ -28,12 +28,11 @@ scene.add_target(PointTarget(position=[0, 200, 0], rcs=0.8))
 # duty_cycle=0.1 means pulse occupies 10% of PRI
 waveform = LFMWaveform(bandwidth=150e6, duty_cycle=0.1)
 
-# Create a flat antenna pattern (beamwidths in radians, peak gain in dB)
+# Create a flat antenna pattern (beamwidths in radians, gain derived from beamwidths)
 antenna = create_antenna_from_preset(
     "flat",
     az_beamwidth=0.05,
     el_beamwidth=0.1,
-    peak_gain_dB=30.0,
 )
 
 radar = Radar(
@@ -247,7 +246,6 @@ antenna = create_antenna_from_preset(
     "sinc",
     az_beamwidth=0.02,
     el_beamwidth=0.04,
-    peak_gain_dB=35.0,
 )
 
 radar = Radar(

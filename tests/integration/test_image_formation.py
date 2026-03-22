@@ -10,24 +10,19 @@ from __future__ import annotations
 
 import numpy as np
 
-from pySimSAR.core.radar import C_LIGHT, AntennaPattern, Radar
+from pySimSAR.core.radar import C_LIGHT, AntennaPattern, Radar, create_antenna_from_preset
 from pySimSAR.core.scene import PointTarget, Scene
 from pySimSAR.core.types import PhaseHistoryData, RawData, SARImage, SARMode
 from pySimSAR.motion.trajectory import Trajectory
 from pySimSAR.simulation.engine import SimulationEngine
 
 
-def _make_isotropic_antenna() -> AntennaPattern:
-    """Create an isotropic antenna for test (uniform gain everywhere)."""
-    az = np.linspace(-np.pi, np.pi, 5)
-    el = np.linspace(-np.pi / 2, np.pi / 2, 5)
-    pattern = np.full((len(el), len(az)), 30.0)
-    return AntennaPattern(
-        pattern_2d=pattern,
+def _make_flat_antenna() -> AntennaPattern:
+    """Create a flat antenna for test (uniform gain inside beam)."""
+    return create_antenna_from_preset(
+        "flat",
         az_beamwidth=np.radians(10),
         el_beamwidth=np.radians(10),
-        az_angles=az,
-        el_angles=el,
     )
 
 
@@ -36,7 +31,7 @@ def _make_radar(mode: str = "stripmap") -> Radar:
     from pySimSAR.waveforms.lfm import LFMWaveform
 
     wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
-    antenna = _make_isotropic_antenna()
+    antenna = _make_flat_antenna()
     return Radar(
         carrier_freq=9.65e9,
         transmit_power=100.0,
@@ -45,7 +40,7 @@ def _make_radar(mode: str = "stripmap") -> Radar:
         polarization="single",
         mode=mode,
         look_side="right",
-        depression_angle=0.7,
+        depression_angle=0.0,  # co-altitude geometry (platform and target at z=0)
     )
 
 
@@ -62,10 +57,13 @@ def _simulate_point_target(
     -------
     tuple of (RawData, Radar, Trajectory, float)
     """
-    if platform_start is None:
-        platform_start = np.array([0.0, -5000.0, 0.0])
     if platform_velocity is None:
         platform_velocity = np.array([0.0, 100.0, 0.0])
+    if platform_start is None:
+        # Centre the aperture on the target azimuth (y=0) so the target
+        # stays within the antenna beam throughout the synthetic aperture.
+        half_aperture = 0.5 * n_pulses * platform_velocity[1] / 1000.0
+        platform_start = np.array([0.0, -half_aperture, 0.0])
 
     scene = Scene(origin_lat=40.0, origin_lon=-105.0, origin_alt=0.0)
     scene.add_target(PointTarget(position=target_pos, rcs=rcs))
@@ -144,7 +142,7 @@ class TestRangeDopplerAlgorithm:
         from pySimSAR.algorithms.image_formation import RangeDopplerAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        platform_start = np.array([0.0, -5000.0, 0.0])
+        platform_start = np.array([0.0, -12.8, 0.0])
         raw_data, radar, trajectory, gate_delay = _simulate_point_target(
             target_pos, platform_start=platform_start, n_pulses=256,
         )
@@ -254,7 +252,7 @@ class TestRangeDopplerAlgorithm:
             scene=scene,
             radar=radar,
             n_pulses=n_pulses,
-            platform_start=np.array([0.0, -5000.0, 0.0]),
+            platform_start=np.array([0.0, -12.8, 0.0]),
             platform_velocity=np.array([0.0, 100.0, 0.0]),
             seed=42,
             sample_rate=sample_rate,
@@ -387,7 +385,7 @@ class TestTwoStepInterface:
         from pySimSAR.algorithms.image_formation import RangeDopplerAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        platform_start = np.array([0.0, -5000.0, 0.0])
+        platform_start = np.array([0.0, -12.8, 0.0])
         raw_data, radar, trajectory, gate_delay = _simulate_point_target(
             target_pos, platform_start=platform_start, n_pulses=64,
         )
@@ -449,7 +447,7 @@ class TestChirpScalingAlgorithm:
         from pySimSAR.algorithms.image_formation import ChirpScalingAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        platform_start = np.array([0.0, -5000.0, 0.0])
+        platform_start = np.array([0.0, -12.8, 0.0])
         raw_data, radar, trajectory, gate_delay = _simulate_point_target(
             target_pos, platform_start=platform_start, n_pulses=256,
         )
@@ -620,7 +618,7 @@ class TestOmegaKAlgorithm:
         from pySimSAR.algorithms.image_formation import OmegaKAlgorithm
 
         target_pos = np.array([5000.0, 0.0, 0.0])
-        platform_start = np.array([0.0, -5000.0, 0.0])
+        platform_start = np.array([0.0, -12.8, 0.0])
         raw_data, radar, trajectory, gate_delay = _simulate_point_target(
             target_pos, platform_start=platform_start, n_pulses=256,
         )

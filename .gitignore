@@ -19,6 +19,14 @@ tests/golden/**/*.png
 # MkDocs build output
 site/
 
+# Claude Code / Speckit (local tooling)
+.claude/
+.specify/
+
+# Working drafts / scratch files
+drafts/
+gui-startup-optimization.md
+
 # IDE / OS
 .vscode/
 .idea/

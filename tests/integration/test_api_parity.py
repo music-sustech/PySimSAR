@@ -71,7 +71,7 @@ def sim_result(scene, radar, bandwidth):
         scene=scene,
         radar=radar,
         n_pulses=64,
-        platform_start=np.array([0.0, -5000.0, 2000.0]),
+        platform_start=np.array([0.0, -3.2, 2000.0]),
         platform_velocity=np.array([0.0, 100.0, 0.0]),
         seed=42,
         sample_rate=2 * bandwidth,

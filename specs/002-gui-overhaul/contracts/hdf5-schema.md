@@ -47,7 +47,7 @@ Existing groups (`/metadata`, `/config`, `/raw_data`, `/navigation`, `/images`) 
     /antenna
       @preset                  # "flat" | "sinc" | "gaussian" | "custom"
       @az_beamwidth_rad, @el_beamwidth_rad
-      @peak_gain_dB
+      @peak_gain_dB            # read-only, derived from beamwidths: G = 4π·η / (θ_az · θ_el)
       pattern_2d               # dataset (n_el, n_az) float32 [optional, for custom]
       az_angles                # dataset (n_az,) float64 [optional]
       el_angles                # dataset (n_el,) float64 [optional]

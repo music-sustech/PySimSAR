@@ -10,22 +10,17 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pySimSAR.core.radar import C_LIGHT, AntennaPattern, Radar
+from pySimSAR.core.radar import C_LIGHT, AntennaPattern, Radar, create_antenna_from_preset
 from pySimSAR.core.scene import PointTarget
 from pySimSAR.waveforms.lfm import LFMWaveform
 
 
 def _make_antenna() -> AntennaPattern:
-    """Create a simple isotropic antenna pattern for testing."""
-    az = np.linspace(-np.pi, np.pi, 5)
-    el = np.linspace(-np.pi / 2, np.pi / 2, 5)
-    pattern = np.zeros((len(el), len(az)))  # 0 dB everywhere
-    return AntennaPattern(
-        pattern_2d=pattern,
+    """Create a simple flat antenna pattern for testing."""
+    return create_antenna_from_preset(
+        "flat",
         az_beamwidth=np.radians(10),
         el_beamwidth=np.radians(10),
-        az_angles=az,
-        el_angles=el,
     )
 
 

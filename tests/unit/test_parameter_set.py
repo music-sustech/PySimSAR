@@ -371,7 +371,7 @@ class TestSaveParameterSet:
             scene.add_target(PointTarget(position=[i * 10, 0, 0], rcs=1.0))
 
         wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
-        ant = create_antenna_from_preset("flat", np.radians(3.0), np.radians(10.0), 30.0)
+        ant = create_antenna_from_preset("flat", np.radians(3.0), np.radians(10.0))
         radar = Radar(
             carrier_freq=9.65e9, transmit_power=1000.0,
             waveform=wf, antenna=ant, polarization="single",

@@ -248,7 +248,7 @@ Antenna radiation pattern model.
 | `el_beamwidth` | `float` | > 0 | 3 dB elevation beamwidth in radians |
 | `az_angles` | `np.ndarray` (n_az,) | — | Azimuth angle samples (if pattern_2d is array) |
 | `el_angles` | `np.ndarray` (n_el,) | — | Elevation angle samples (if pattern_2d is array) |
-| `peak_gain_dB` | `float` | — | Peak antenna gain in dB |
+| `peak_gain_dB` | `float` | — | **Read-only.** Peak antenna gain in dB, derived from beamwidths |
 
 **Relationships**: Belongs to `Radar`.
 

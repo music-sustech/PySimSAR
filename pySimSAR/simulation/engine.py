@@ -204,7 +204,7 @@ class SimulationEngine:
         if platform_start is not None:
             self._start_pos = np.asarray(platform_start, dtype=float)
         else:
-            self._start_pos = np.array([0.0, -5000.0, 2000.0])
+            self._start_pos = np.array([0.0, 0.0, 0.0])
 
         # Build or accept SARModeConfig
         if sar_mode_config is not None:

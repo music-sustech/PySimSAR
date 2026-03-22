@@ -4,14 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PySimSAR is a Spec-Driven Development project using the Speckit framework (v0.3.0) with Claude Code integration. It is initialized from a Specify template and configured with PowerShell scripts.
+PySimSAR is a Python SAR raw signal simulator with modular processing algorithms.
+It uses Spec-Driven Development with the Speckit framework and Claude Code integration.
 
 ## Project Rules
+
 - **Linting:** Always run `ruff check . --fix` after modifying Python files.
 - **Style:** We follow PEP8; no unused imports or variables in the final PR.
 - **Complexity:** Keep cyclomatic complexity under 10 for signal processing functions.
-- **Synchronized docs** After modifying code, make sure to update the relevant spec/plan/task and docs.
-
+- **Synchronized docs:** After modifying code, update the relevant spec/plan/task and docs.
 
 ## Development Workflow
 
@@ -33,20 +34,6 @@ Features are developed through the Speckit pipeline:
 - Main branch for PRs: `main`
 - Each feature gets a `specs/###-feature-name/` directory with all artifacts
 
-## Key Directories
-
-- `.specify/templates/` — Spec document templates (spec, plan, tasks, checklist, constitution, agent-file)
-- `.specify/scripts/powershell/` — Operational scripts (create-new-feature, setup-plan, check-prerequisites, common utilities)
-- `.specify/memory/constitution.md` — Project constitution (template state, needs customization via `/speckit.constitution`)
-- `.claude/commands/` — All Speckit command definitions
-
-## Template Resolution Priority
-
-1. `.specify/templates/overrides/` (project-specific)
-2. `.specify/presets/` (preset-provided)
-3. `.specify/extensions/` (extension-provided)
-4. `.specify/templates/` (core defaults)
-
 ## Task Format
 
 ```
@@ -55,23 +42,4 @@ Features are developed through the Speckit pipeline:
 - `[P]` = parallelizable
 - Story labels: `[US1]`, `[US2]`, etc.
 - Priorities: P1 (MVP), P2, P3
-
-
-
-## Prerequisites
-- PowerShell (cross-platform `pwsh`)
-- Git
-- Claude Code
-
-## Environment
-- OS: Windows 11
-- Shell: PowerShell 5.1 / pwsh
-- Python: 3.14 at C:\Users\Xiaoguang\AppData\Local\Programs\Python\Python314\python.exe
-
-## Shell conventions
-- Use PowerShell syntax, not bash (no `&&`, use `;` or separate commands)
-- Path separator is `\`
-- Use `python` not `python3`
-- To chain commands: `cd "path"; python -m pytest` or use `-Command` blocks
-- Prefer `$env:VAR` over `export VAR=`
 

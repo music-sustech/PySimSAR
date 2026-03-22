@@ -89,7 +89,7 @@ platform passes y = 0.
 | type | preset/flat | Rectangular beam with uniform gain inside and -60 dB floor outside. The simplest pattern -- eliminates gain variation within the beam so all pulses illuminate the target with equal gain |
 | az_beamwidth | 3.0 deg | Beam footprint at R0 = 2828 m is R0 * theta = 2828 * 0.0524 = 148 m. The synthetic aperture (25.6 m) fits well within this footprint, so all 256 pulses illuminate the target |
 | el_beamwidth | 10.0 deg | Wide enough to illuminate the target without elevation-dependent gain variation |
-| peak_gain | 30 dB | G = 1000 linear. Two-way gain = 60 dB = 10^6 linear. Provides enough signal to exceed the noise floor after integration |
+| peak_gain (derived) | ~29.2 dB | Automatically computed from beamwidths: G = 4π·0.6 / (0.052 × 0.175) = 824 → 29.2 dB. Two-way gain ≈ 58.3 dB |
 
 ### Platform
 

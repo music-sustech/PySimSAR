@@ -96,7 +96,7 @@ Same as Case 1 (LFM, 150 MHz, 10% duty, no window, no phase noise).
 | preset | gaussian | Smooth gain taper with K=12 (3 dB at half-beamwidth). More representative of real SAR antennas than the flat pattern. Tests a different antenna preset code path from Cases 1 and 2. The gaussian beam gives smooth amplitude weighting across the aperture, which is typical for airborne SAR systems |
 | az_beamwidth | 3.0 deg | Same as Case 1. Beam footprint = 2828 * 0.052 = 148 m. The 51.2 m aperture fits within the 3 dB beam |
 | el_beamwidth | 10.0 deg | Same as Case 1 |
-| peak_gain | 30 dB | Same as Cases 1 and 2 |
+| peak_gain (derived) | ~29.2 dB | Automatically computed from beamwidths: G = 4π·0.6 / (0.052 × 0.175) = 824 → 29.2 dB |
 
 ### Platform
 

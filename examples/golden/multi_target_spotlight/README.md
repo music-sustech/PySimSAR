@@ -117,7 +117,7 @@ enough to be clearly resolved.
 | preset | sinc | The sinc pattern approximates a uniformly illuminated rectangular aperture -- the textbook SAR antenna. It has nulls and sidelobes, introducing gain variation that the simulator must handle correctly. Case 1 uses flat (no variation), so this tests a different code path in compute_two_way_gain |
 | az_beamwidth | 5.0 deg | Wider than Case 1 (3 deg) to ensure all three targets fall within the main beam. At 4243 m range, the 3 dB footprint is 4243 * 0.087 = 370 m -- well beyond the 10 m target azimuth spread |
 | el_beamwidth | 15.0 deg | Wide elevation beam to avoid clipping targets at slightly different elevation angles |
-| peak_gain | 30 dB | Same as Case 1 |
+| peak_gain (derived) | ~25.2 dB | Automatically computed from beamwidths: G = 4π·0.6 / (0.087 × 0.262) = 330 → 25.2 dB |
 
 ### Platform
 

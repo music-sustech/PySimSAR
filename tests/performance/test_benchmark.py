@@ -74,7 +74,7 @@ def _create_radar() -> Radar:
         polarization="single",
         mode="stripmap",
         look_side="right",
-        depression_angle=0.7,
+        depression_angle=np.arctan2(2000.0, 5000.0),  # match platform z=2000
     )
 
 
@@ -107,7 +107,7 @@ class TestSimulationBenchmark:
             scene=scene,
             radar=radar,
             n_pulses=N_PULSES,
-            platform_start=np.array([0.0, -5000.0, 2000.0]),
+            platform_start=np.array([0.0, -12.8, 2000.0]),
             platform_velocity=np.array([0.0, 100.0, 0.0]),
             seed=42,
             sample_rate=sample_rate,

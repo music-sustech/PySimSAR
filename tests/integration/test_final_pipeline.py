@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pySimSAR.core.radar import AntennaPattern, Radar
+from pySimSAR.core.radar import Radar, create_antenna_from_preset
 from pySimSAR.core.scene import PointTarget, Scene
 from pySimSAR.core.types import RawData, SARImage
 from pySimSAR.io.config import ProcessingConfig
@@ -46,15 +46,10 @@ def _setup_quad_pol_simulation():
 
     # 2. X-band LFM radar in quad-pol mode
     wf = LFMWaveform(bandwidth=150e6, duty_cycle=0.1, prf=1000.0)
-    az = np.linspace(-np.pi, np.pi, 5)
-    el = np.linspace(-np.pi / 2, np.pi / 2, 5)
-    pattern = np.full((len(el), len(az)), 30.0)
-    antenna = AntennaPattern(
-        pattern_2d=pattern,
+    antenna = create_antenna_from_preset(
+        "flat",
         az_beamwidth=np.radians(10),
         el_beamwidth=np.radians(10),
-        az_angles=az,
-        el_angles=el,
     )
     radar = Radar(
         carrier_freq=9.65e9,
@@ -64,7 +59,7 @@ def _setup_quad_pol_simulation():
         polarization="quad",
         mode="stripmap",
         look_side="right",
-        depression_angle=0.7,
+        depression_angle=np.arctan2(2000.0, 5000.0),  # match platform altitude
     )
 
     sample_rate = 2.0 * radar.bandwidth
@@ -74,7 +69,7 @@ def _setup_quad_pol_simulation():
         scene=scene,
         radar=radar,
         n_pulses=N_PULSES,
-        platform_start=np.array([0.0, -5000.0, 0.0]),
+        platform_start=np.array([0.0, -6.4, 2000.0]),
         platform_velocity=np.array([0.0, 100.0, 0.0]),
         seed=42,
         sample_rate=sample_rate,
