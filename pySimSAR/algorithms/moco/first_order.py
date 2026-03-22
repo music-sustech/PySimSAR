@@ -14,10 +14,13 @@ Algorithm:
 from __future__ import annotations
 
 import numpy as np
-from scipy.interpolate import interp1d
-from scipy.signal import savgol_filter
 
 from pySimSAR.algorithms.base import MotionCompensationAlgorithm
+from pySimSAR.algorithms.moco.nav_helpers import (
+    align_nav_positions,
+    fit_straight_line,
+    smooth_positions,
+)
 from pySimSAR.core.radar import C_LIGHT
 from pySimSAR.core.types import RawData
 from pySimSAR.motion.trajectory import Trajectory
@@ -86,11 +89,11 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
         wavelength = C_LIGHT / raw_data.carrier_freq
 
         # Get measured positions aligned to pulse times
-        nav_pos = self._align_nav_positions(n_az, raw_data.prf, nav_data)
+        nav_pos = align_nav_positions(n_az, raw_data.prf, nav_data)
 
         # Smooth GPS positions to remove measurement noise while
         # preserving the low-frequency motion errors we want to correct.
-        smoothed_pos = self._smooth_positions(nav_pos)
+        smoothed_pos = smooth_positions(nav_pos)
 
         # Determine reference positions
         if reference_track is not None:
@@ -99,7 +102,7 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
             )
         else:
             # Fit a straight-line reference from GPS data
-            ref_pos = self._fit_straight_line(smoothed_pos)
+            ref_pos = fit_straight_line(smoothed_pos)
 
         # Reference velocities (numerical differentiation of ref_pos)
         dt = 1.0 / raw_data.prf
@@ -142,20 +145,11 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
         prf: float,
         nav_data: NavigationData,
     ) -> np.ndarray:
-        """Interpolate GPS positions to pulse times, shape (n_az, 3)."""
-        if nav_data.position is None:
-            raise ValueError("NavigationData must contain position measurements")
-        pulse_times = np.arange(n_az) / prf
-        if len(nav_data.time) == n_az:
-            return nav_data.position.copy()
-        interp = interp1d(
-            nav_data.time,
-            nav_data.position,
-            axis=0,
-            kind="linear",
-            fill_value="extrapolate",
-        )
-        return interp(pulse_times)
+        """Interpolate GPS positions to pulse times, shape (n_az, 3).
+
+        Delegates to :func:`nav_helpers.align_nav_positions`.
+        """
+        return align_nav_positions(n_az, prf, nav_data)
 
     @staticmethod
     def _align_ref_positions(
@@ -179,32 +173,9 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
     def _smooth_positions(positions: np.ndarray) -> np.ndarray:
         """Smooth GPS positions with a Savitzky-Golay filter.
 
-        Removes high-frequency measurement noise while preserving the
-        low-frequency platform motion that MoCo needs to correct.
-
-        Parameters
-        ----------
-        positions : np.ndarray
-            Raw GPS positions, shape (N, 3).
-
-        Returns
-        -------
-        np.ndarray
-            Smoothed positions, shape (N, 3).
+        Delegates to :func:`nav_helpers.smooth_positions`.
         """
-        n = len(positions)
-        # Window must be odd and <= n; use ~5% of aperture, min 5
-        window = max(5, n // 20) | 1  # ensure odd
-        window = min(window, n if n % 2 == 1 else n - 1)
-        if window < 5:
-            return positions.copy()
-        poly_order = min(3, window - 1)
-        smoothed = np.empty_like(positions)
-        for axis in range(3):
-            smoothed[:, axis] = savgol_filter(
-                positions[:, axis], window, poly_order
-            )
-        return smoothed
+        return smooth_positions(positions)
 
     # ------------------------------------------------------------------
     # Straight-line reference fit
@@ -214,26 +185,9 @@ class FirstOrderMoCo(MotionCompensationAlgorithm):
     def _fit_straight_line(positions: np.ndarray) -> np.ndarray:
         """Fit a straight-line trajectory through measured positions.
 
-        Performs a least-squares linear fit: pos(n) = p0 + v * t(n),
-        independently for each axis.
-
-        Parameters
-        ----------
-        positions : np.ndarray
-            Measured positions, shape (N, 3).
-
-        Returns
-        -------
-        np.ndarray
-            Fitted straight-line positions, shape (N, 3).
+        Delegates to :func:`nav_helpers.fit_straight_line`.
         """
-        n = len(positions)
-        t = np.arange(n, dtype=float)
-        # Design matrix: [1, t]
-        A = np.column_stack([np.ones(n), t])
-        # Solve for each axis: coeffs shape (2, 3)
-        coeffs, _, _, _ = np.linalg.lstsq(A, positions, rcond=None)
-        return A @ coeffs
+        return fit_straight_line(positions)
 
     # ------------------------------------------------------------------
     # Scene center estimation

@@ -65,6 +65,27 @@ class PhaseGradientAutofocus(AutofocusAlgorithm):
     # Public API
     # ------------------------------------------------------------------
 
+    def estimate_phase_error(self, phase_history: object) -> np.ndarray:
+        """Estimate residual phase error from phase history data.
+
+        PGA requires an image-domain representation to select dominant
+        scatterers and measure mainlobe widths.  A basic azimuth FFT is
+        performed internally to produce a coarse image before delegating
+        to the existing gradient-based estimator.
+
+        Parameters
+        ----------
+        phase_history : PhaseHistoryData
+            Range-compressed phase history data, shape (n_azimuth, n_range).
+
+        Returns
+        -------
+        np.ndarray
+            Phase error estimate, shape (n_azimuth,), in radians.
+        """
+        image = np.fft.fftshift(np.fft.fft(phase_history.data, axis=0), axes=0)
+        return self._estimate_phase_error_from_image(image)
+
     def focus(self, phase_history: object, azimuth_compressor: object) -> object:
         """Apply PGA autofocus to phase history data.
 
