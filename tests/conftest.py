@@ -177,16 +177,6 @@ def fmcw_waveform_params():
     }
 
 
-@pytest.fixture
-def platform_params():
-    """Parameters for a straight-line airborne platform."""
-    return {
-        "velocity": 100.0,
-        "altitude": 2000.0,
-        "heading": 0.0,
-        "start_position": np.array([-500.0, -5000.0, 2000.0]),
-    }
-
 
 @pytest.fixture
 def gps_sensor_params():

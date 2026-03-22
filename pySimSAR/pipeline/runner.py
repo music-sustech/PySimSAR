@@ -169,13 +169,18 @@ class PipelineRunner:
             # After MoCo, echo phases are consistent with the fitted
             # straight-line reference. Build a matching Trajectory for
             # downstream image formation.
+            from pySimSAR.algorithms.moco.nav_helpers import (
+                align_nav_positions,
+                fit_straight_line,
+                smooth_positions,
+            )
             from pySimSAR.motion.trajectory import Trajectory as _Traj
             first_rd = raw_data[next(iter(raw_data))]
-            nav_pos = moco_alg._align_nav_positions(
+            nav_pos = align_nav_positions(
                 first_rd.echo.shape[0], first_rd.prf, moco_nav,
             )
-            smoothed_pos = moco_alg._smooth_positions(nav_pos)
-            fitted_pos = moco_alg._fit_straight_line(smoothed_pos)
+            smoothed_pos = smooth_positions(nav_pos)
+            fitted_pos = fit_straight_line(smoothed_pos)
             dt = 1.0 / raw_data[next(iter(raw_data))].prf
             fitted_vel = np.gradient(fitted_pos, dt, axis=0)
             trajectory = _Traj(

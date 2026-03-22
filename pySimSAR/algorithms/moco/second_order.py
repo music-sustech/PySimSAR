@@ -18,6 +18,10 @@ import numpy as np
 
 from pySimSAR.algorithms.base import MotionCompensationAlgorithm
 from pySimSAR.algorithms.moco.first_order import FirstOrderMoCo
+from pySimSAR.algorithms.moco.nav_helpers import (
+    align_nav_positions,
+    fit_straight_line,
+)
 from pySimSAR.core.radar import C_LIGHT
 from pySimSAR.core.types import RawData
 from pySimSAR.sensors.nav_data import NavigationData
@@ -82,10 +86,8 @@ class SecondOrderMoCo(MotionCompensationAlgorithm):
         wavelength = C_LIGHT / raw_data.carrier_freq
 
         # Get positions
-        nav_pos = first_order._align_nav_positions(
-            n_az, raw_data.prf, nav_data
-        )
-        ref_pos = first_order._fit_straight_line(nav_pos)
+        nav_pos = align_nav_positions(n_az, raw_data.prf, nav_data)
+        ref_pos = fit_straight_line(nav_pos)
 
         # Reference velocities
         dt = 1.0 / raw_data.prf
